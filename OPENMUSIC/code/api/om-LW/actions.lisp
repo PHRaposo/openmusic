@@ -68,23 +68,38 @@
 
 
 (defun internal-mouse-position (view)
-  (or (ignore-errors 
+  (or (ignore-errors
         (multiple-value-bind (x y)
             (if view (capi::current-pointer-position :relative-to view :pane-relative-p t)
               (capi::current-pointer-position))
           (om-make-point x y)))
       (om-make-point 0 0)))
 
+(defun om-zoom-mouse-pos-maybe-unscale (view raw)
+  "Return RAW divided by VIEW's effective zoom when
+*om-zoom-unscale-mouse-pos-p* is bound T; return RAW otherwise."
+  (if (and *om-zoom-unscale-mouse-pos-p* view)
+      (let ((zoom (om-zoom-effective view)))
+        (if (or (null zoom) (= zoom 1.0))
+            raw
+            (om-zoom-unscale-point raw zoom)))
+      raw))
 
 (defmethod om-mouse-position ((view null))
   (internal-mouse-position nil))
 
+;(defmethod om-mouse-position ((view om-graphic-object))
+;  (internal-mouse-position view))
 (defmethod om-mouse-position ((view om-graphic-object))
-  (internal-mouse-position view))
+  (om-zoom-mouse-pos-maybe-unscale view (internal-mouse-position view)))
 
+;(defmethod om-mouse-position ((view om-item-view))
+;  (om-convert-coordinates (internal-mouse-position (item-container view))
+;                          (item-container view) view))
 (defmethod om-mouse-position ((view om-item-view))
-  (om-convert-coordinates (internal-mouse-position (item-container view))
-                          (item-container view) view))
+  (om-zoom-mouse-pos-maybe-unscale view
+    (om-convert-coordinates (internal-mouse-position (item-container view))
+                            (item-container view) view)))
 
 
 ;;; Recursive event dispatcher on subviews (om-view catches events but om-item-views do not)

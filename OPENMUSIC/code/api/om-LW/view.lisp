@@ -212,31 +212,53 @@
 ;;;======================
 ;;; OM-SCROLLER
 ;;;======================
-(defclass om-scroller (om-view) 
+(defclass om-scroller (om-view)
    ((fw :initform 0 :initarg :fw :accessor fw)
     (fh :initform 0 :initarg :fh :accessor fh)
     (scrollbars :initform t :initarg :scrollbars :accessor scrollbars)
     (retain-scrollbars :initform nil :initarg :retain-scrollbars :accessor retain-scrollbars)
     (displayed-p :initform nil :initarg :displayed-p :accessor displayed-p)
+    (tracked-scroll-x :initform 0 :accessor tracked-scroll-x)
+    (tracked-scroll-y :initform 0 :accessor tracked-scroll-y)
     )
    ;(:default-initargs :simple-pane-scroll-callback 'scroll-update)
    (:default-initargs :background :white)
    )
 
+(declaim (special *om-zoom-in-progress-p*))
+
 ;;; :simple-pane-scroll-callback
-(defmethod scroll-update ((self om-scroller) dimension operation pos-list &rest options) 
-  ;(print (list self dimension operation pos-list))
+(defmethod scroll-update ((self om-scroller) dimension operation pos-list &rest options)
+  (declare (ignore options))
+  ;; Skip axis-only re-emits that auto-scroll fires during om-zoom-update;
+  ;; they would clobber the tracked scroll with stale single-axis values.
+  (when (and *om-zoom-in-progress-p*
+             (member dimension '(:horizontal :vertical))
+             (numberp pos-list))
+    (return-from scroll-update nil))
+  ;; Mirror pos-list into tracked-scroll on every :move event. CAPI's
+  ;; :slug-position lags the real pan on Cocoa auto-scroll pinboard-layout,
+  ;; so the tracked pair is the authoritative source for om-zoom anchoring.
+  (when (eq operation :move)
+    (cond
+     ((and (consp pos-list) (numberp (first pos-list)) (numberp (second pos-list)))
+      (setf (tracked-scroll-x self) (first pos-list)
+            (tracked-scroll-y self) (second pos-list)))
+     ((and (eq dimension :horizontal) (numberp pos-list))
+      (setf (tracked-scroll-x self) pos-list))
+     ((and (eq dimension :vertical) (numberp pos-list))
+      (setf (tracked-scroll-y self) pos-list))))
   (case dimension
     (:vertical (setf pos-list (list 0 pos-list)))
     (:horizontal (setf pos-list (list pos-list 0)))
     (otherwise nil))
   (case operation
-    (:move 
-     (when (and (car pos-list) (cadr pos-list)) 
+    (:move
+     (when (and (car pos-list) (cadr pos-list))
        (let ((x (om-h-scroll-position self))
              (y (om-v-scroll-position self)))
          (om-invalidate-rectangle self x y (vw self) (vh self))
-         #+win32(setf (static-layout-child-position (main-pinboard-object self)) 
+         #+win32(setf (static-layout-child-position (main-pinboard-object self))
 				  (values x y))
          ))
      (om-view-scrolled self (car pos-list) (cadr pos-list)))
@@ -320,9 +342,11 @@
 
 ;#+(or cocoa win32)
 (defmethod om-set-scroll-position ((self om-scroller) pos)
-  (capi::apply-in-pane-process 
+  (setf (tracked-scroll-x self) (om-point-h pos)
+        (tracked-scroll-y self) (om-point-v pos))
+  (capi::apply-in-pane-process
    self
-   'capi::scroll self :pan :move 
+   'capi::scroll self :pan :move
    (list (om-point-h pos) (om-point-v pos))))
 
 #|
@@ -334,9 +358,11 @@
 ;#+linux
 ;for scrolling shortcuts only
 (defmethod om-move-scroll-position ((self om-scroller) pos)
-  (capi::apply-in-pane-process 
+  (setf (tracked-scroll-x self) (om-point-h pos)
+        (tracked-scroll-y self) (om-point-v pos))
+  (capi::apply-in-pane-process
    self
-   'capi::scroll self :pan :move 
+   'capi::scroll self :pan :move
    (list (om-point-h pos) (om-point-v pos))))
 
 (defmethod om-h-scroll-position ((self om-scroller))
@@ -345,10 +371,12 @@
 (defmethod om-v-scroll-position ((self om-scroller))
   (or (capi::get-vertical-scroll-parameters self :slug-position) 0))
 
-(defmethod om-set-h-scroll-position ((self om-scroller) pos) 
+(defmethod om-set-h-scroll-position ((self om-scroller) pos)
+  (setf (tracked-scroll-x self) pos)
   (capi::set-horizontal-scroll-parameters self :slug-position pos))
 
-(defmethod om-set-v-scroll-position ((self om-scroller) pos) 
+(defmethod om-set-v-scroll-position ((self om-scroller) pos)
+  (setf (tracked-scroll-y self) pos)
   (capi::set-vertical-scroll-parameters self :slug-position pos))
 
 ;;; au cas ou...
@@ -358,9 +386,9 @@
 
 (defmethod om-set-h-scroll-position ((self om-graphic-object) pos) t)
 
-(defmethod update-for-subviews-changes ((self om-scroller) &optional (recursive nil)) 
+(defmethod update-for-subviews-changes ((self om-scroller) &optional (recursive nil))
   (if (initialized-p self)
-      (capi::apply-in-pane-process self (lambda () 
+      (capi::apply-in-pane-process self (lambda ()
 					(let ((v (capi::get-vertical-scroll-parameters self :max-range))
                                               (h (capi::get-horizontal-scroll-parameters self :max-range))
                                               (x (capi::get-horizontal-scroll-parameters self :slug-position))
@@ -369,6 +397,8 @@
                                           (capi::set-vertical-scroll-parameters self :min-range 0 :max-range v)
                                           (capi::set-horizontal-scroll-parameters self :min-range 0 :max-range h)
                                           (capi::scroll self :pan :move (list x y))
+                                          (setf (tracked-scroll-x self) x
+                                                (tracked-scroll-y self) y)
                                           )))
     (apply-in-pane-process self (lambda () (set-layout self))))
     (when recursive (mapc #'(lambda (view) (if (om-view-p view) (update-for-subviews-changes view t))) (vsubviews self)))
@@ -495,10 +525,379 @@
                    ))
     tl))
 
-(defmethod om-current-view ((self om-tab-layout)) 
+(defmethod om-current-view ((self om-tab-layout))
   (capi::tab-layout-visible-child self))
 
 (export '(om-tab-layout om-make-tab-layout om-current-view) :om-api)
+
+
+;;;======================
+;;; ZOOM
+;;;======================
+
+(defparameter +om-zoom-min+ 0.5)
+(defparameter +om-zoom-max+ 4.0)
+
+(defvar *om-zoom-default* 1.0)
+(defvar *om-zoom-gesture-sensitivity* 1.0)
+(defvar *om-zoom-windows-trackpad-multiplier* 2.0)
+
+(defvar *om-zoom-in-progress-p* nil)
+(defvar *om-zoom-unscale-mouse-pos-p* nil)
+
+(defvar *om-zoom-diag-events-p* nil)
+(defvar *om-zoom-diag-apply-p* nil)
+
+(defvar *om-zoom-mini-helper-scale* 1.0)
+
+(defun om-zoom-log-error (where c)
+  "Log condition C to the OM listener tagged with WHERE."
+  (let ((s (or om-lisp:*om-stream* *standard-output*)))
+    (format s "~&[om-zoom] ERROR in ~A: ~A~%   condition-type=~S~%"
+            where (princ-to-string c) (type-of c))
+    (finish-output s)))
+
+(defun om-zoom-diag-log (fmt &rest args)
+  (when *om-zoom-diag-events-p*
+    (let ((s (or om-lisp:*om-stream* *standard-output*)))
+      (apply #'format s
+             (concatenate 'string "~&[om-zoom-diag] " fmt "~%")
+             args)
+      (finish-output s))))
+
+(defun om-clamp-zoom (z)
+  "Clamp Z to [+om-zoom-min+, +om-zoom-max+]."
+  (min +om-zoom-max+ (max +om-zoom-min+ z)))
+
+(defun om-zoom-scale-point (pt factor)
+  "PT scaled by FACTOR, rounded to integer coords."
+  (om-make-point (round (* factor (om-point-h pt)))
+                 (round (* factor (om-point-v pt)))))
+
+(defun om-zoom-unscale-point (pt factor)
+  "PT divided by FACTOR, rounded to integer coords."
+  (om-make-point (round (/ (om-point-h pt) factor))
+                 (round (/ (om-point-v pt) factor))))
+
+(defun om-zoom-scale-font (font zoom)
+  "FONT with size scaled by ZOOM; FONT returned unchanged on error."
+  (handler-case
+      (let* ((desc  (if (typep font 'gp:font-description)
+                        font
+                        (gp:font-description font)))
+             (attrs (gp:font-description-attributes desc))
+             (size  (or (getf attrs :size) 12)))
+        (gp:augment-font-description desc :size (max 1 (round (* size zoom)))))
+    (error (c) (om-zoom-log-error :scale-font c) font)))
+
+(defgeneric om-zoom-of (pane)
+  (:documentation "Current zoom factor of PANE."))
+
+(defmethod om-zoom-of ((pane t))
+  (or (capi:capi-object-property pane :om-zoom-factor) *om-zoom-default*))
+
+(defgeneric (setf om-zoom-of) (value pane))
+
+(defmethod (setf om-zoom-of) (value (pane t))
+  (setf (capi:capi-object-property pane :om-zoom-factor) value))
+
+(defun om-zoom-transformed-p (pane)
+  "T iff PANE has a non-identity zoom transform."
+  (/= (om-zoom-of pane) 1.0))
+
+(defun om-zoom-find-ancestor-zoom (frame)
+  "Zoom factor of FRAME's nearest om-scroller ancestor, or session default."
+  (loop for f = frame then (om-view-container f)
+        while f
+        when (typep f 'om-scroller) return (om-zoom-of f)
+        finally (return *om-zoom-default*)))
+
+(defun om-zoom-effective (self)
+  "Zoom factor that applies to SELF."
+  (cond
+   ((typep self 'om-scroller) (om-zoom-of self))
+   (t (let ((pane (om-view-container self)))
+        (cond
+         ((typep pane 'om-scroller) (om-zoom-of pane))
+         (pane (om-zoom-find-ancestor-zoom pane))
+         (t *om-zoom-default*))))))
+
+(defun om-zoom-capture-logical-geom (frame)
+  "Snapshot FRAME's current pos and size as the LOGICAL reference; idempotent."
+  (unless (om-zoom-logical-pos frame)
+    (setf (om-zoom-logical-pos frame) (om-view-position frame)))
+  (unless (om-zoom-logical-size frame)
+    (setf (om-zoom-logical-size frame) (om-view-size frame))))
+
+(defun om-zoom-capture-logical-font (frame)
+  "Snapshot FRAME's current font as the LOGICAL reference; idempotent."
+  (unless (om-zoom-logical-font frame)
+    (let ((current (om-get-font frame)))
+      (when current
+        (setf (om-zoom-logical-font frame) current)))))
+
+(defgeneric om-zoom-applies-p (pane)
+  (:documentation "T iff zoom gestures apply to PANE."))
+
+(defmethod om-zoom-applies-p ((pane t))   t)
+(defmethod om-zoom-applies-p ((pane null)) nil)
+
+(declaim (special *om-default-font0* *om-default-font1* *om-default-font2*
+                  *om-default-font3* *om-default-font4*
+                  *om-default-font1b* *om-default-font2b*
+                  *om-default-font3b* *om-default-font4b*
+                  *ombox-font* *icon-size-factor* *miniview-font-size*))
+
+(defun om-current-default-font0 (frame)
+  (let ((zoom (om-zoom-effective frame)))
+    (if (or (null *om-default-font0*) (= zoom 1.0))
+        *om-default-font0*
+        (om-zoom-scale-font *om-default-font0* zoom))))
+
+(defun om-current-default-font1 (frame)
+  (let ((zoom (om-zoom-effective frame)))
+    (if (or (null *om-default-font1*) (= zoom 1.0))
+        *om-default-font1*
+        (om-zoom-scale-font *om-default-font1* zoom))))
+
+(defun om-current-default-font2 (frame)
+  (let ((zoom (om-zoom-effective frame)))
+    (if (or (null *om-default-font2*) (= zoom 1.0))
+        *om-default-font2*
+        (om-zoom-scale-font *om-default-font2* zoom))))
+
+(defun om-current-default-font3 (frame)
+  (let ((zoom (om-zoom-effective frame)))
+    (if (or (null *om-default-font3*) (= zoom 1.0))
+        *om-default-font3*
+        (om-zoom-scale-font *om-default-font3* zoom))))
+
+(defun om-current-default-font4 (frame)
+  (let ((zoom (om-zoom-effective frame)))
+    (if (or (null *om-default-font4*) (= zoom 1.0))
+        *om-default-font4*
+        (om-zoom-scale-font *om-default-font4* zoom))))
+
+(defun om-current-default-font1b (frame)
+  (let ((zoom (om-zoom-effective frame)))
+    (if (or (null *om-default-font1b*) (= zoom 1.0))
+        *om-default-font1b*
+        (om-zoom-scale-font *om-default-font1b* zoom))))
+
+(defun om-current-default-font2b (frame)
+  (let ((zoom (om-zoom-effective frame)))
+    (if (or (null *om-default-font2b*) (= zoom 1.0))
+        *om-default-font2b*
+        (om-zoom-scale-font *om-default-font2b* zoom))))
+
+(defun om-current-default-font3b (frame)
+  (let ((zoom (om-zoom-effective frame)))
+    (if (or (null *om-default-font3b*) (= zoom 1.0))
+        *om-default-font3b*
+        (om-zoom-scale-font *om-default-font3b* zoom))))
+
+(defun om-current-default-font4b (frame)
+  (let ((zoom (om-zoom-effective frame)))
+    (if (or (null *om-default-font4b*) (= zoom 1.0))
+        *om-default-font4b*
+        (om-zoom-scale-font *om-default-font4b* zoom))))
+
+(defun om-current-ombox-font (frame)
+  (let ((zoom (om-zoom-effective frame)))
+    (if (or (null *ombox-font*) (= zoom 1.0))
+        *ombox-font*
+        (om-zoom-scale-font *ombox-font* zoom))))
+
+(defun om-current-icon-size-factor (frame)
+  (let ((zoom (om-zoom-effective frame)))
+    (if (= zoom 1.0)
+        *icon-size-factor*
+        (* *icon-size-factor* zoom))))
+
+(defun om-current-miniview-font-size (frame)
+  (let ((zoom (om-zoom-effective frame)))
+    (if (= zoom 1.0)
+        *miniview-font-size*
+        (max 1 (round (* *miniview-font-size* zoom))))))
+
+#+win32
+(defun om-zoom-touch-anchor (pane x y)
+  (declare (ignore pane))
+  (values x y))
+
+#-win32
+(defun om-zoom-touch-anchor (pane x y)
+  (values (- x (tracked-scroll-x pane))
+          (- y (tracked-scroll-y pane))))
+
+(defgeneric om-zoom-relayout-frame (frame)
+  (:documentation "Re-apply layout to FRAME after PANE's zoom changed."))
+
+(defmethod om-zoom-relayout-frame ((frame t)) nil)
+
+(defgeneric om-zoom-touch-update (pane scale anchor-x anchor-y)
+  (:documentation "Apply a multiplicative SCALE gesture to PANE's zoom."))
+
+(defmethod om-zoom-touch-update ((pane t) scale anchor-x anchor-y)
+  (declare (ignore scale anchor-x anchor-y))
+  nil)
+
+(defmethod om-zoom-touch-update ((pane om-scroller) scale anchor-x anchor-y)
+  (om-zoom-update pane (* (om-zoom-of pane) scale) anchor-x anchor-y))
+
+(defgeneric om-zoom-sync-display (pane factor)
+  (:documentation "Refresh PANE's zoom-display chrome after FACTOR changed."))
+
+(defmethod om-zoom-sync-display ((pane t) factor)
+  (declare (ignore factor))
+  nil)
+
+(defgeneric om-zoom-redraw-connections (frame)
+  (:documentation "Refresh FRAME's connection points after a zoom relayout."))
+
+(defmethod om-zoom-redraw-connections ((frame t)) nil)
+
+(defun om-zoom-update (pane new-zoom &optional anchor-x anchor-y)
+  "Set PANE's zoom to NEW-ZOOM (clamped) anchored at (ANCHOR-X, ANCHOR-Y).
+Returns the clamped factor, or NIL when no change."
+  (let* ((old-zoom (om-zoom-of pane))
+         (clamped  (om-clamp-zoom new-zoom)))
+    (unless (= clamped old-zoom)
+      (let* ((ratio    (if (zerop old-zoom) 1 (/ clamped old-zoom)))
+             (old-sx   (tracked-scroll-x pane))
+             (old-sy   (tracked-scroll-y pane))
+             (vx       (or anchor-x 0))
+             (vy       (or anchor-y 0))
+             (new-sx   (max 0 (round (+ (* vx (- ratio 1)) (* old-sx ratio)))))
+             (new-sy   (max 0 (round (+ (* vy (- ratio 1)) (* old-sy ratio))))))
+        (setf (om-zoom-of pane) clamped)
+        (setf (tracked-scroll-x pane) new-sx)
+        (setf (tracked-scroll-y pane) new-sy)
+        (om-zoom-sync-display pane clamped)
+        (let ((*om-zoom-in-progress-p* t))
+          (unwind-protect
+              (capi:with-atomic-redisplay (pane)
+                (dolist (frame (om-subviews pane))
+                  (om-zoom-relayout-frame frame))
+                (dolist (frame (om-subviews pane))
+                  (om-zoom-redraw-connections frame))
+                (multiple-value-bind (vw vh) (capi:simple-pane-visible-size pane)
+                  (let ((content-h 0)
+                        (content-v 0))
+                    (dolist (sub (om-subviews pane))
+                      (let ((p (handler-case (om-view-position sub)
+                                 (error (c) (om-zoom-log-error :zoom-update-subview-pos c) nil)))
+                            (s (handler-case (om-view-size sub)
+                                 (error (c) (om-zoom-log-error :zoom-update-subview-size c) nil))))
+                        (when (and p s)
+                          (let ((right  (+ (om-point-h p) (om-point-h s)))
+                                (bottom (+ (om-point-v p) (om-point-v s))))
+                            (when (> right  content-h) (setf content-h right))
+                            (when (> bottom content-v) (setf content-v bottom))))))
+                    (let ((target-h (max (or vw 0) content-h (+ new-sx (or vw 0))))
+                          (target-v (max (or vh 0) content-v (+ new-sy (or vh 0)))))
+                      (capi::set-horizontal-scroll-parameters pane :min-range 0 :max-range target-h)
+                      (capi::set-vertical-scroll-parameters   pane :min-range 0 :max-range target-v))))
+                (om-set-h-scroll-position pane new-sx)
+                (om-set-v-scroll-position pane new-sy)
+                (capi::scroll pane :pan :move (list new-sx new-sy)))
+            (om-invalidate-view pane t)))
+        clamped))))
+
+(defun om-set-zoom   (pane factor) (om-zoom-update pane factor))
+(defun om-reset-zoom (pane)        (om-zoom-update pane 1.0))
+(defun om-get-zoom   (pane)        (om-zoom-of pane))
+
+(defun om-zoom-touch-handler (pane x y scale)
+  (let* ((sensitivity (or *om-zoom-gesture-sensitivity* 1.0))
+         (boost       #+win32 *om-zoom-windows-trackpad-multiplier*
+                      #-win32 1.0)
+         (eff-scale   (+ 1.0 (* (- scale 1.0) sensitivity boost))))
+    (when (and (typep pane 'om-scroller) (om-zoom-applies-p pane))
+      (multiple-value-bind (vx vy) (om-zoom-touch-anchor pane x y)
+        (om-zoom-touch-update pane eff-scale vx vy)))))
+
+#+win32
+(defun om-zoom-touch-pan-handler (pane x y dx dy)
+  (declare (ignore x y))
+  (when (and (typep pane 'om-scroller)
+             (om-zoom-applies-p pane)
+             (or (not (zerop dx)) (not (zerop dy))))
+    (let* ((pos   (om-scroll-position pane))
+           (hpos  (om-point-h pos))
+           (vpos  (om-point-v pos))
+           (new-x (max 0 (+ hpos (round dx))))
+           (new-y (max 0 (+ vpos (round dy)))))
+      (om-move-scroll-position pane (om-make-point new-x new-y))
+      (om-set-h-scroll-position pane new-x)
+      (om-set-v-scroll-position pane new-y)
+      (om-invalidate-view pane t))))
+
+;; The :om package is created by build-om.lisp AFTER api/om-LW loads;
+;; defer kernel symbol lookup to runtime.
+(defun om-zoom-scroll-pane (pane direction)
+  (let* ((pkg (find-package :om))
+         (sym (and pkg (find-symbol "SCROLL-PANE" pkg))))
+    (when (and sym (fboundp sym))
+      (funcall sym pane direction))))
+
+(defun om-zoom-shift-wheel-handler (pane x y angle)
+  (declare (ignore x y))
+  (when (and (typep pane 'om-scroller) (om-zoom-applies-p pane))
+    (cond ((plusp  angle) (om-zoom-scroll-pane pane :om-key-right))
+          ((minusp angle) (om-zoom-scroll-pane pane :om-key-left)))))
+
+(defun om-zoom-touch-swipe-handler (pane x y direction)
+  (declare (ignore x y))
+  (when (and (typep pane 'om-scroller) (om-zoom-applies-p pane))
+    (case direction
+      (:left  (om-zoom-scroll-pane pane :om-key-left))
+      (:right (om-zoom-scroll-pane pane :om-key-right))
+      (:up    (om-zoom-scroll-pane pane :om-key-up))
+      (:down  (om-zoom-scroll-pane pane :om-key-down)))))
+
+(defun om-zoom-ctrl-arrow-handler (pane x y gspec)
+  (declare (ignore x y))
+  (when (and (typep pane 'om-scroller) (om-zoom-applies-p pane))
+    (let ((data (sys:gesture-spec-data gspec)))
+      (case data
+        (:left  (om-zoom-scroll-pane pane :om-key-left))
+        (:right (om-zoom-scroll-pane pane :om-key-right))
+        (:up    (om-zoom-scroll-pane pane :om-key-up))
+        (:down  (om-zoom-scroll-pane pane :om-key-down))))))
+
+(export '(+om-zoom-min+ +om-zoom-max+
+          *om-zoom-default* *om-zoom-gesture-sensitivity*
+          *om-zoom-windows-trackpad-multiplier*
+          *om-zoom-in-progress-p* *om-zoom-unscale-mouse-pos-p*
+          *om-zoom-diag-events-p* *om-zoom-diag-apply-p*
+          *om-zoom-mini-helper-scale*
+          om-zoom-log-error om-zoom-diag-log
+          om-clamp-zoom om-zoom-scale-point om-zoom-unscale-point
+          om-zoom-scale-font
+          om-zoom-of om-zoom-transformed-p om-zoom-find-ancestor-zoom
+          om-zoom-effective
+          om-zoom-logical-pos om-zoom-logical-size om-zoom-logical-font
+          om-zoom-capture-logical-geom om-zoom-capture-logical-font
+          om-zoom-applies-p
+          om-zoom-relayout-frame om-zoom-touch-update
+          om-zoom-sync-display om-zoom-redraw-connections
+          om-current-default-font0 om-current-default-font1
+          om-current-default-font2 om-current-default-font3
+          om-current-default-font4
+          om-current-default-font1b om-current-default-font2b
+          om-current-default-font3b om-current-default-font4b
+          om-current-ombox-font
+          om-current-icon-size-factor om-current-miniview-font-size
+          om-zoom-update om-set-zoom om-reset-zoom om-get-zoom
+          om-zoom-touch-handler om-zoom-shift-wheel-handler
+          om-zoom-touch-swipe-handler om-zoom-ctrl-arrow-handler
+          om-zoom-scroll-pane
+          #+win32 om-zoom-touch-pan-handler
+          om-zoom-touch-anchor
+          tracked-scroll-x tracked-scroll-y
+          om-move-scroll-position)
+        :om-api)
 
 
 
