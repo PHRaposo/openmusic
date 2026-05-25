@@ -1024,7 +1024,7 @@ preset). Click opens a CAPI menu of preset percentages."))
 
 (defclass om-zoom-musical-font-pop-up (om-view)
   ((zoom-value     :initarg :value     :initform 24   :accessor zoom-value)
-   (zoom-presets   :initarg :presets   :initform '(8 12 16 20 24 28 32 36 48 64) :accessor zoom-presets)
+   (zoom-presets   :initarg :presets   :initform nil  :accessor zoom-presets)
    (zoom-action    :initarg :di-action :initform nil  :accessor zoom-action)
    (zoom-text-font :initarg :font      :initform nil  :accessor zoom-text-font)
    (zoom-fg-color  :initarg :fg-color  :initform nil  :accessor zoom-fg-color))

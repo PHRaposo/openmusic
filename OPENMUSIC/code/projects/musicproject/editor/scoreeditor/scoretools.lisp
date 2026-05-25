@@ -846,25 +846,49 @@
     (draw-extras self view size staff)
     ))
 
+#|
 (defun draw-auxiliar-lines (self x y  size realpos headsizex)
   (when (auxlines self)
-    (om-with-fg-color nil *system-color* 
+    (om-with-fg-color nil *system-color*
       (let ((dir (car (auxlines self)))
-            (topy (+ (- y (round size 8)) (second (auxlines self))))        
+            (topy (+ (- y (round size 8)) (second (auxlines self))))
             (limy (+ (- y (round size 8)) (third (auxlines self)))))
         (if (equal dir 'dw)
           (progn
-            (setf topy (+ topy (round size 4))) 
+            (setf topy (+ topy (round size 4)))
             (loop while (<= topy limy) do
-                  (om-draw-line (- realpos (round size 8)) topy 
+                  (om-draw-line (- realpos (round size 8)) topy
                                 (+  headsizex  realpos) topy)
                   (setf topy (+ topy (round size 4)))))
           (progn
-            (setf topy (- topy (round size 4))) 
+            (setf topy (- topy (round size 4)))
             (loop while (>= topy limy) do
-                  (om-draw-line (- realpos (round size 8)) topy 
+                  (om-draw-line (- realpos (round size 8)) topy
                                 (+  headsizex  realpos) topy)
                   (setf topy (- topy (round size 4))))))))))
+|#
+
+;;; FLOOR (not ROUND) so the step is never larger than the auxlines gap (size/4).
+;;; With ROUND, sizes where (round size 4) > size/4 (e.g., 27, 30, 31, 35) lose all aux lines.
+(defun draw-auxiliar-lines (self x y  size realpos headsizex)
+  (when (auxlines self)
+    (om-with-fg-color nil *system-color*
+      (let ((dir (car (auxlines self)))
+            (topy (+ (- y (round size 8)) (second (auxlines self))))
+            (limy (+ (- y (round size 8)) (third (auxlines self)))))
+        (if (equal dir 'dw)
+          (progn
+            (setf topy (+ topy (floor size 4)))
+            (loop while (<= topy limy) do
+                  (om-draw-line (- realpos (round size 8)) topy
+                                (+  headsizex  realpos) topy)
+                  (setf topy (+ topy (floor size 4)))))
+          (progn
+            (setf topy (- topy (floor size 4)))
+            (loop while (>= topy limy) do
+                  (om-draw-line (- realpos (round size 8)) topy
+                                (+  headsizex  realpos) topy)
+                  (setf topy (- topy (floor size 4))))))))))
 
 
 (defmethod get-tie-direction ((self grap-note) staff)

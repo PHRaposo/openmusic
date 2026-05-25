@@ -37,7 +37,7 @@ This branch introduces an **experimental** zoom feature for OM editors. The impl
 - Patch editor and score editor (and editors that inherit from them) — zoom-aware.
 - Maquette editor — keeps its own native zoom; the generic zoom bar does not apply.
 - Box icons (miniviews) in the patch — scale with the parent patch zoom (e.g. BPF, BPC, board, array, sound).
-- Music editor: temporary zoom (canvas scaling). **todo**: scale musical fonts.
+- Music editor (Note, Chord, Chord-Seq, Multi-Seq, Voice, Poly) — musical font size scales with gestures, shortcuts and the bar pop-up. Native horizontal zoom (staff spacing) remains on the bar numbox.
 - Fluid interface boxes and dialog-item interface boxes — partial. **todo**: complete fixes.
 - **todo**: extend zoom to other editors.
 

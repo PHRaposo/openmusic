@@ -540,7 +540,7 @@
 
 (defvar *om-zoom-default* 1.0)
 (defvar *om-zoom-gesture-sensitivity* 1.0)
-(defvar *om-zoom-windows-trackpad-multiplier* 2.0)
+(defvar *om-zoom-trackpad-boost* 1.0)
 
 (defvar *om-zoom-in-progress-p* nil)
 (defvar *om-zoom-unscale-mouse-pos-p* nil)
@@ -810,8 +810,7 @@ Returns the clamped factor, or NIL when no change."
 
 (defun om-zoom-touch-handler (pane x y scale)
   (let* ((sensitivity (or *om-zoom-gesture-sensitivity* 1.0))
-         (boost       #+win32 *om-zoom-windows-trackpad-multiplier*
-                      #-win32 1.0)
+         (boost       *om-zoom-trackpad-boost*)
          (eff-scale   (+ 1.0 (* (- scale 1.0) sensitivity boost))))
     (when (and (typep pane 'om-scroller) (om-zoom-applies-p pane))
       (multiple-value-bind (vx vy) (om-zoom-touch-anchor pane x y)
@@ -868,7 +867,7 @@ Returns the clamped factor, or NIL when no change."
 
 (export '(+om-zoom-min+ +om-zoom-max+
           *om-zoom-default* *om-zoom-gesture-sensitivity*
-          *om-zoom-windows-trackpad-multiplier*
+          *om-zoom-trackpad-boost*
           *om-zoom-in-progress-p* *om-zoom-unscale-mouse-pos-p*
           *om-zoom-diag-events-p* *om-zoom-diag-apply-p*
           *om-zoom-mini-helper-scale*
