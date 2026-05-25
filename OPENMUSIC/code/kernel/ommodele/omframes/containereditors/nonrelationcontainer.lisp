@@ -622,9 +622,14 @@ Workspace Panels contain icons of patches, maquettes and folders
 (patch-icon-frame, maquette-icon-frame and folder-icon-frame instances).#enddoc#
 #seealso# (OmWorkspace patch-icon-frame maquette-icon-frame folder-icon-frame) #seealso#"))
  
+#|
 (defmethod set-panel-color ((self workSpacePanel))
   (om-set-bg-color self *ws-color*)
   (om-invalidate-view self t))
+|#
+
+(defmethod set-panel-color ((self workSpacePanel))
+  (om-set-bg-color self *ws-color*))
 
 
 ;(defmethod set-field-size ((self workspacepanel))
@@ -1088,5 +1093,33 @@ Elements in these editors are instance-icon-frame instances.#enddoc#
 (defclass InternalMethPanel (GenericFunPanel) ()
    (:documentation "This is the class for the editor of init methods and read/write slots methods associated to an OMClass.#enddoc#
 #seealso# (OMClass) #seealso#"))
+
+
+;; Icon-browser panels: structurally incompatible with the canvas zoom
+;; (their layout recomputes from logical-pixel globals on every redraw,
+;; undoing any prior scaling). Pin om-zoom-of to 1.0 to opt them out.
+
+(defmethod om-zoom-of ((pane workSpacePanel))     1.0)
+(defmethod om-zoom-of ((pane folderPanel))        1.0)
+(defmethod om-zoom-of ((pane GlobalsfolderPanel)) 1.0)
+(defmethod om-zoom-of ((pane classPanel))         1.0)
+(defmethod om-zoom-of ((pane GenericFunPanel))    1.0)
+
+(defmethod (setf om-zoom-of) (value (pane workSpacePanel))
+  (declare (ignore value)) 1.0)
+(defmethod (setf om-zoom-of) (value (pane folderPanel))
+  (declare (ignore value)) 1.0)
+(defmethod (setf om-zoom-of) (value (pane GlobalsfolderPanel))
+  (declare (ignore value)) 1.0)
+(defmethod (setf om-zoom-of) (value (pane classPanel))
+  (declare (ignore value)) 1.0)
+(defmethod (setf om-zoom-of) (value (pane GenericFunPanel))
+  (declare (ignore value)) 1.0)
+
+(defmethod om-zoom-applies-p ((pane workSpacePanel))     nil)
+(defmethod om-zoom-applies-p ((pane folderPanel))        nil)
+(defmethod om-zoom-applies-p ((pane GlobalsfolderPanel)) nil)
+(defmethod om-zoom-applies-p ((pane classPanel))         nil)
+(defmethod om-zoom-applies-p ((pane GenericFunPanel))    nil)
 
 

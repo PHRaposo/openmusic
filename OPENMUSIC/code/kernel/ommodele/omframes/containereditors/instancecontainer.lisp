@@ -179,7 +179,7 @@ Elements of these editors are instance-icon-frame instances.#enddoc#
 
 (defmethod panel-position ((self listEditor)) (om-make-point 0 20))
 
-;;; enlevé les 15 du scroller
+;;; enlevï¿½ les 15 du scroller
 (defmethod panel-size ((self listEditor)) 
    ;(om-make-point (- (w self) 15) (- (h self) 35))
    (om-make-point (w self) (- (h self) 20))
@@ -311,8 +311,16 @@ Elements of these editors are instance-icon-frame instances.#enddoc#
            (advance-range (om-view-container self) 0)
            (pos-select pos)))
 
-        (:om-key-down 
+        (:om-key-down
          (let ((pos (selected-pos)))
            (advance-range (om-view-container self) 1)
            (pos-select pos)))
         ))))
+
+
+;; Icon browser: opts out of the canvas zoom (see nonrelationcontainer.lisp).
+(defmethod om-zoom-of ((pane InstancePanel)) 1.0)
+(defmethod (setf om-zoom-of) (value (pane InstancePanel))
+  (declare (ignore value)) 1.0)
+
+(defmethod om-zoom-applies-p ((pane InstancePanel)) nil)

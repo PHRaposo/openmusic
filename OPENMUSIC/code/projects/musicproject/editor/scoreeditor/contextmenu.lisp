@@ -73,36 +73,86 @@
                            (om-new-leafmenu "Eval"
                                             #'(lambda () (eval-score (panel object))))))))))))
 
+#|
 (defmethod scorepatch-menu-items ((self scoreeditor))
   (let ((posi (om-mouse-position self))
         (panel (panel self)))
-    (list 
-     (om-new-leafmenu "Comment" #'(lambda () 
+    (list
+     (om-new-leafmenu "Comment" #'(lambda ()
                                     (let ((newbox (omNG-make-new-boxcall 'comment posi "comment")))
                                       (when newbox
                                         (omG-add-element (panel self) (make-frame-from-callobj newbox))
                                         ))))
-     (list 
+     (list
       (om-package-fun2menu *om-package-tree* nil #'(lambda (f) (add-box-from-menu f posi)))
       (om-package-classes2menu *om-package-tree* nil #'(lambda (c) (add-box-from-menu c posi)))
       )
-     (list 
-      (om-new-menu "Internal..." 
-                   (om-new-leafmenu "Patch" #'(lambda () (omG-add-element panel (make-frame-from-callobj 
-                                                                                 (omNG-make-new-boxcall 
+     (list
+      (om-new-menu "Internal..."
+                   (om-new-leafmenu "Patch" #'(lambda () (omG-add-element panel (make-frame-from-callobj
+                                                                                 (omNG-make-new-boxcall
                                                                                   (make-instance 'OMPatchAbs :name "mypatch" :icon 210)
                                                                                   posi (mk-unique-name panel "mypatch"))))))
-                   (om-new-leafmenu "Maquette" #'(lambda () (omG-add-element panel (make-frame-from-callobj 
-                                                                                    (omNG-make-new-boxcall 
+                   (om-new-leafmenu "Maquette" #'(lambda () (omG-add-element panel (make-frame-from-callobj
+                                                                                    (omNG-make-new-boxcall
                                                                                      (make-instance 'OMMaqAbs :name "mymaquette" :icon 265)
                                                                                      posi (mk-unique-name panel "mymaquette"))))))
                    (om-new-leafmenu "Loop" #'(lambda () (add-box-from-menu (fdefinition 'omloop) posi)))
-                   (om-new-leafmenu "Lisp Function" #'(lambda () (omG-add-element panel 
-                                                                                  (make-frame-from-callobj 
-                                                                                   (omNG-make-new-boxcall 
+                   (om-new-leafmenu "Lisp Function" #'(lambda () (omG-add-element panel
+                                                                                  (make-frame-from-callobj
+                                                                                   (omNG-make-new-boxcall
                                                                                     (make-instance 'OMLispPatchAbs :name "lispfunction" :icon 123)
-         
+
                                                                                     posi (mk-unique-name panel "lispfunction")))))))))))
+|#
+
+(defmethod scorepatch-menu-items ((self scoreeditor))
+  (let* ((vis-posi (om-mouse-position self))
+         (panel    (panel self))
+         (zoom     (if panel (om-zoom-of panel) 1.0))
+         (log-posi (if (= zoom 1.0) vis-posi (om-zoom-unscale-point vis-posi zoom))))
+    (list
+     (om-new-leafmenu "Comment" #'(lambda ()
+                                    (let ((newbox (omNG-make-new-boxcall 'comment log-posi "comment")))
+                                      (when newbox
+                                        (let ((p (panel self)))
+                                          (omG-add-element p
+                                                           (let ((*make-frame-zoom-context*
+                                                                  (and (typep p 'om-scroller) (om-zoom-of p))))
+                                                             (make-frame-from-callobj newbox))))
+                                        ))))
+     (list
+      (om-package-fun2menu *om-package-tree* nil #'(lambda (f) (add-box-from-menu f vis-posi)))
+      (om-package-classes2menu *om-package-tree* nil #'(lambda (c) (add-box-from-menu c vis-posi)))
+      )
+     (list
+      (om-new-menu "Internal..."
+                   (om-new-leafmenu "Patch" #'(lambda ()
+                                                (omG-add-element panel
+                                                                 (let ((*make-frame-zoom-context*
+                                                                        (and (typep panel 'om-scroller) (om-zoom-of panel))))
+                                                                   (make-frame-from-callobj
+                                                                    (omNG-make-new-boxcall
+                                                                     (make-instance 'OMPatchAbs :name "mypatch" :icon 210)
+                                                                     log-posi (mk-unique-name panel "mypatch")))))))
+                   (om-new-leafmenu "Maquette" #'(lambda ()
+                                                   (omG-add-element panel
+                                                                    (let ((*make-frame-zoom-context*
+                                                                           (and (typep panel 'om-scroller) (om-zoom-of panel))))
+                                                                      (make-frame-from-callobj
+                                                                       (omNG-make-new-boxcall
+                                                                        (make-instance 'OMMaqAbs :name "mymaquette" :icon 265)
+                                                                        log-posi (mk-unique-name panel "mymaquette")))))))
+                   (om-new-leafmenu "Loop" #'(lambda () (add-box-from-menu (fdefinition 'omloop) vis-posi)))
+                   (om-new-leafmenu "Lisp Function" #'(lambda ()
+                                                        (omG-add-element panel
+                                                                         (let ((*make-frame-zoom-context*
+                                                                                (and (typep panel 'om-scroller) (om-zoom-of panel))))
+                                                                           (make-frame-from-callobj
+                                                                            (omNG-make-new-boxcall
+                                                                             (make-instance 'OMLispPatchAbs :name "lispfunction" :icon 123)
+
+                                                                             log-posi (mk-unique-name panel "lispfunction"))))))))))))
 
 
 (defmethod om-get-menu-context ((self scorepanel))

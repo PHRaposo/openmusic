@@ -55,7 +55,10 @@ maquettes and hierarchical class editors.#enddoc#
      (om-with-delayed-redraw (panel newwindow)
        (om-with-delayed-update (panel newwindow)
          (mapc #'(lambda (elem)
-                   (let ((newframe (make-frame-from-callobj elem)))
+                   (let ((newframe (let ((*make-frame-zoom-context*
+                                          (and (typep (panel newwindow) 'om-scroller)
+                                               (om-zoom-of (panel newwindow)))))
+                                     (make-frame-from-callobj elem))))
                      (om-add-subviews (panel newwindow) newframe)
                      (add-subview-extra newframe)
                      )) elements)
@@ -123,7 +126,9 @@ maquettes and hierarchical class editors.#enddoc#
              (mapcar #'(lambda (object)
                          (setf (name object) (mk-unique-name container (name object)))
                          (setf (frame-position object) (paste-position object self))
-                         (let ((new-frame (make-frame-from-callobj object)))
+                         (let ((new-frame (let ((*make-frame-zoom-context*
+                                                 (and (typep container 'om-scroller) (om-zoom-of container))))
+                                            (make-frame-from-callobj object))))
                            (omG-add-element container new-frame)
                            (omG-select new-frame))) new-boxes)
              )
@@ -161,7 +166,10 @@ maquettes and hierarchical class editors.#enddoc#
            (let (framelist)
              (om-with-delayed-update (panel self)
                (mapc #'(lambda (elem)
-                         (let ((newframe (make-frame-from-callobj elem)))
+                         (let ((newframe (let ((*make-frame-zoom-context*
+                                                (and (typep (panel self) 'om-scroller)
+                                                     (om-zoom-of (panel self)))))
+                                           (make-frame-from-callobj elem))))
                            (push newframe framelist)
                            (om-add-subviews (panel self) newframe)
                            (add-subview-extra newframe)
@@ -226,7 +234,9 @@ maquettes and hierarchical class editors.#enddoc#
        (mapcar #'(lambda (oldframe)
                    (setf object (omNG-make-alias (object oldframe)))
                    (when object
-                     (let ((new-frame (make-frame-from-callobj object)))
+                     (let ((new-frame (let ((*make-frame-zoom-context*
+                                             (and (typep container 'om-scroller) (om-zoom-of container))))
+                                        (make-frame-from-callobj object))))
                        (omG-add-element container new-frame)
                        (omG-select new-frame)))) subframes))))
 
@@ -275,6 +285,7 @@ Patches, maquettes and hierarchical class editors are sub-classes of this class.
 (defmethod add-window-buttons ((self relationPanel))
    "Add extra buttons at the top-button in 'self'." nil)
 
+#|
 (defmethod omG-add-element ((self relationPanel) frame)
    "Add a boxframe to the scroller, this method call the 'omNG-add-element' method with the objects referenced by 'self' and 'frame'."
    (omNG-add-element (object self) (object frame))
@@ -287,6 +298,19 @@ Patches, maquettes and hierarchical class editors are sub-classes of this class.
    ;; dans om-add-subviews
    ;;(set-field-size self)
    )
+|#
+
+(defmethod omG-add-element ((self relationPanel) frame)
+  "Add a boxframe to the scroller, this method call the 'omNG-add-element' method
+   with the objects referenced by 'self' and 'frame'."
+  (omNG-add-element (object self) (object frame))
+  (om-add-subviews self frame)
+  (add-subview-extra frame)
+  (when (and (typep frame 'boxframe)
+             (function-without-name-p (reference (object frame))))
+    (let ((logical-size (om-make-point 36 36)))
+      (setf (frame-size (object frame)) logical-size)
+      (om-set-view-size frame logical-size))))
 
 
 (defmethod omg-remove-element ((self relationPanel) frame)
@@ -447,17 +471,32 @@ it redraw the connections involving in the deleying operation."
         (call-next-method))))
 
 ;;;;Click on the scroller not in a subview.
+#|
 (defmethod control-actives ((view relationPanel) where)
-  (close-enter-dialog (editor view)) 
+  (close-enter-dialog (editor view))
   (unless (click-in-connection view where)
     (let* ((float (om-subtract-points (om-mouse-position view) where)))
       (unless (om-shift-key-p)
-        (mapc #'(lambda (control) 
+        (mapc #'(lambda (control)
                   (deactivate-connect control)) (get-connections view)))
-      (cond 
+      (cond
        ((and (om-command-key-p) (not (om-option-key-p))) ;to avoid auto-connect
         (make-undefined-box view where))
        (t (call-next-method))))))
+|#
+
+(defmethod control-actives ((view relationPanel) where)
+  (close-enter-dialog (editor view))
+  (unless (click-in-connection view where)
+    (unless (om-shift-key-p)
+      (mapc #'(lambda (control)
+                (deactivate-connect control)) (get-connections view)))
+    (cond
+     ((and (om-command-key-p) (not (om-option-key-p))) ;to avoid auto-connect
+      (let* ((zoom (if (typep view 'om-scroller) (om-zoom-of view) 1.0))
+             (logical-where (if (= zoom 1.0) where (om-zoom-unscale-point where zoom))))
+        (make-undefined-box view logical-where)))
+     (t (call-next-method)))))
 
 
 

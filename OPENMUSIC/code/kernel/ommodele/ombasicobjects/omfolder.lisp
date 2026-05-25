@@ -49,15 +49,32 @@
          (y (om-point-y size)))
     (format nil "(om-make-point ~D ~D)" x y)))
       
+#|
 (defmethod header-comment-from-obj ((self OMFolder))
   (let* ((icon (icon self))
          (ftype (obj-file-type self))
          (version  *om-version*)
          (wspar (om-save-point-list (ensure-ws-params self)))
-         (size (if (editorframe self) 
+         (size (if (editorframe self)
                    (read-from-string (format-folder-size self))
                  (third wspar)))
-         (params (list version ftype (first wspar) (second wspar) 
+         (params (list version ftype (first wspar) (second wspar)
+                       size
+                       (str-without-nl (doc self)) (save-icon icon) (presentation self)
+                       (car (create-info self)) nil)))
+    (string+ ";" (format nil " ~S" params))))
+|#
+
+(defmethod header-comment-from-obj ((self OMFolder))
+  (let* ((icon (icon self))
+         (ftype (obj-file-type self))
+         (version  *om-version*)
+         (ws (ensure-ws-params self))
+         (wspar (om-save-point-list (subseq ws 0 (min 3 (length ws)))))
+         (size (if (editorframe self)
+                   (read-from-string (format-folder-size self))
+                 (third wspar)))
+         (params (list version ftype (first wspar) (second wspar)
                        size
                        (str-without-nl (doc self)) (save-icon icon) (presentation self)
                        (car (create-info self)) nil)))

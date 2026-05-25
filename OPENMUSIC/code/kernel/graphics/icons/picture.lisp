@@ -164,17 +164,36 @@
       (setf (pict-size newpict) (pict-size self)))
     newpict))
 
+#|
 (defmethod draw-pict-patch ((self patch-picture) view)
    (let ((pictsize (pict-size self))
            (x0 (om-point-h (pict-pos self)))
            (y0 (om-point-v (pict-pos self))))
-     (if (thepict self) 
+     (if (thepict self)
          (om-draw-picture view (thepict self) :pos (om-make-point x0 y0) :size pictsize)
        (draw-lost-picture self view x0 y0 (om-point-h pictsize) (om-point-v pictsize)))
      (loop for o in (extraobjs self) do (draw-pict-extraobj view o (om-make-point x0 y0) pictsize))
      (when (selected-p self)
        (om-with-line-size 2
          (om-draw-rect (+ 1 x0) (+ 1 y0) (- (om-point-h pictsize) 2) (- (om-point-v pictsize) 2))))))
+|#
+
+(defmethod draw-pict-patch ((self patch-picture) view)
+  (let* ((zoom     (om-zoom-of view))
+         (vis-pos  (if (= zoom 1.0) (pict-pos  self) (om-zoom-scale-point (pict-pos  self) zoom)))
+         (vis-size (if (= zoom 1.0) (pict-size self) (om-zoom-scale-point (pict-size self) zoom)))
+         (x0       (om-point-h vis-pos))
+         (y0       (om-point-v vis-pos))
+         (w        (om-point-h vis-size))
+         (h        (om-point-v vis-size))
+         (pen      (max 1 (round (* 2 zoom)))))
+    (if (thepict self)
+        (om-draw-picture view (thepict self) :pos vis-pos :size vis-size)
+      (draw-lost-picture self view x0 y0 w h))
+    (loop for o in (extraobjs self) do (draw-pict-extraobj view o vis-pos vis-size))
+    (when (selected-p self)
+      (om-with-line-size pen
+        (om-draw-rect (+ 1 x0) (+ 1 y0) (- w 2) (- h 2))))))
 
 (defmethod omNG-save ((self patch-picture) &optional (values? nil))
   `(let ((newpict ,(call-next-method)))

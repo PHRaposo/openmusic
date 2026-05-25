@@ -114,7 +114,9 @@
        (loop for item in conec-to-me do
              (change-conections  object item newbox))
        (omg-remove-element container self)
-       (setf frame (make-frame-from-callobj newbox))
+       (setf frame (let ((*make-frame-zoom-context*
+                          (and (typep container 'om-scroller) (om-zoom-of container))))
+                     (make-frame-from-callobj newbox)))
        (omg-add-element  container frame)
        (compile-patch newpatch)
        (update-graphic-connections frame (get-elements (object container))))))
@@ -152,7 +154,9 @@
       (setf conec-to-me (get-conect-to-me object))
       (loop for item in conec-to-me do
             (change-conections object item newbox))
-      (setf frame (make-frame-from-callobj newbox))
+      (setf frame (let ((*make-frame-zoom-context*
+                         (and (typep container 'om-scroller) (om-zoom-of container))))
+                    (make-frame-from-callobj newbox)))
       (omg-remove-element container self)
       (compile-patch newpatch)
       (omg-add-element  container frame)
@@ -313,7 +317,9 @@
       (loop for item in conec-to-me do
             (change-conections  object item newbox))
       (omg-remove-element  container self)
-      (setf frame (make-frame-from-callobj newbox))
+      (setf frame (let ((*make-frame-zoom-context*
+                         (and (typep container 'om-scroller) (om-zoom-of container))))
+                    (make-frame-from-callobj newbox)))
       (omg-add-element  container frame)
       (update-graphic-connections frame (get-elements (object container))))))
 
@@ -350,7 +356,9 @@
       (setf conec-to-me (get-conect-to-me object))
       (loop for item in conec-to-me do
             (change-conections  object item newbox))
-      (setf frame (make-frame-from-callobj newbox))
+      (setf frame (let ((*make-frame-zoom-context*
+                         (and (typep container 'om-scroller) (om-zoom-of container))))
+                    (make-frame-from-callobj newbox)))
       (omg-remove-element  container self)
       ;(compile-patch newpatch)
       (omg-add-element  container frame)

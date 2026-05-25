@@ -360,7 +360,10 @@
   (let* ((newcall (omNG-make-new-boxcall (class-of obj) position (mk-unique-name self "dragged"))))
      (setf (value newcall) obj)
      (setf (showpict newcall) t)
-     (omG-add-element self (make-frame-from-callobj  newcall)) t))
+     (omG-add-element self
+                      (let ((*make-frame-zoom-context*
+                             (and (typep self 'om-scroller) (om-zoom-of self))))
+                        (make-frame-from-callobj newcall))) t))
 
 (defmethod make-and-add-box ((self maquettepanel) obj position)
   (let* ((maqpos (get-offset/posy-from-pixel self position))
@@ -369,7 +372,10 @@
      (setf (offset newcall) (om-point-h  maqpos))
      (setf (posy newcall) (om-point-v  maqpos))
      (setf (showpict newcall) t)
-     (omG-add-element self (make-frame-from-callobj  newcall)) t))
+     (omG-add-element self
+                      (let ((*make-frame-zoom-context*
+                             (and (typep self 'om-scroller) (om-zoom-of self))))
+                        (make-frame-from-callobj newcall))) t))
 
 
 (defmethod score-to-patch ((self patchpanel) (source-view t) (type-obj t) (obj-list t) (position t)) nil)

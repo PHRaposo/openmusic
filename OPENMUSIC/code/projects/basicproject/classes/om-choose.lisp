@@ -313,14 +313,30 @@ It allows to choose/select items of a list to be outputed."))
 
 (defmethod add-choose-enabled ((self patchpanel) type) t)
 
+#|
 (defmethod add-choose ((self patchpanel) position)
    (when (add-choose-enabled self 'om-choose)
-     (let* ((boxes (get-subframes self)) 
+     (let* ((boxes (get-subframes self))
             (i (length (list+ (find-class-boxes boxes 'tempOutFrame) (find-class-boxes boxes 'chooseframe))))
             (pos (or position (om-make-point (+ 5 (* i 50)) 240)))
             (newsend (make-new-choose (mk-unique-name self "om-choose") i pos t))
             )
        (omG-add-element self (make-frame-from-callobj newchoose))
+       (set-field-size self)
+       )))
+|#
+
+(defmethod add-choose ((self patchpanel) position)
+   (when (add-choose-enabled self 'om-choose)
+     (let* ((boxes (get-subframes self))
+            (i (length (list+ (find-class-boxes boxes 'tempOutFrame) (find-class-boxes boxes 'chooseframe))))
+            (pos (or position (om-make-point (+ 5 (* i 50)) 240)))
+            (newsend (make-new-choose (mk-unique-name self "om-choose") i pos t))
+            )
+       (omG-add-element self
+                        (let ((*make-frame-zoom-context*
+                               (and (typep self 'om-scroller) (om-zoom-of self))))
+                          (make-frame-from-callobj newchoose)))
        (set-field-size self)
        )))
 

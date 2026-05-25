@@ -128,6 +128,7 @@ Lock the box ('b') to keep the current file.
          ;                       #'(lambda () (sdif-player-options))))
          ))
              
+#|
 (defmethod draw-obj-in-rect ((self sdiffile) x x1 y y1 params view)
   (cond ((and (filepathname self) (loaded self))
          (om-draw-string (+ x 2) (+ y 12) "SDIF FILE contents:")
@@ -141,6 +142,33 @@ Lock the box ('b') to keep the current file.
         ((not (filepathname self))
          (om-draw-string 6 14 "[no file loaded]"))
         ))
+|#
+
+(defmethod draw-obj-in-rect ((self sdiffile) x x1 y y1 params view)
+  (let* ((zoom        (om-zoom-effective view))
+         (scale-p     (and (numberp zoom) (/= zoom 1.0)))
+         (scaled-font (if scale-p (om-zoom-scale-font *om-default-font1* zoom) *om-default-font1*))
+         (m2  (if scale-p (max 1 (round (* 2  zoom))) 2))
+         (m6  (if scale-p (max 1 (round (* 6  zoom))) 6))
+         (m12 (if scale-p (max 1 (round (* 12 zoom))) 12))
+         (m14 (if scale-p (max 1 (round (* 14 zoom))) 14))
+         (m24 (if scale-p (max 1 (round (* 24 zoom))) 24)))
+    (flet ((body ()
+             (cond ((and (filepathname self) (loaded self))
+                    (om-draw-string (+ x m2) (+ y m12) "SDIF FILE contents:")
+                    (loop for str in (streamsdesc self) for pos = m24 then (+ pos m12) do
+                          (om-draw-string (+ x m6) (+ y pos) (format nil "~D:~A ~A" (fstreamdesc-id str) (fstreamdesc-fsig str)
+                                                                     (mapcar 'mstreamdesc-msig (fstreamdesc-matrices str))))
+                          ))
+                   ((filepathname self)
+                    (om-with-fg-color view *om-red-color*
+                      (om-draw-string m6 m14 (namestring (filepathname self)))))
+                   ((not (filepathname self))
+                    (om-draw-string m6 m14 "[no file loaded]"))
+                   )))
+      (if scale-p
+          (om-with-font scaled-font (body))
+        (body)))))
 
 
 (defmethod OpenObjectEditor ((self sdifFilebox)) 

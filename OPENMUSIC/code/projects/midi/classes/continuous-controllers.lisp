@@ -237,6 +237,7 @@ MIDIControl can be 'played' as a musical object (for instance in a maquette) on 
   (draw-obj-in-rect value 0 (w self) 0  (h self) nil self)
   )
 
+#|
 (defmethod draw-obj-in-rect ((self MidiControl) x x1 y y1 edparams view)
   (let ((tmpBPF (create-bpf-with-initpt self)))
     (om-with-focused-view view
@@ -245,6 +246,20 @@ MIDIControl can be 'played' as a musical object (for instance in a maquette) on 
       (om-draw-rect 0 0 (- (w view) 1) (- (h view) 1))
     (draw-obj-in-rect tmpBPF x x1 y y1 (give-bpf-range tmpBPF) view)
     ))))
+|#
+
+(defmethod draw-obj-in-rect ((self MidiControl) x x1 y y1 edparams view)
+  (let* ((zoom        (om-zoom-effective view))
+         (scaled-font (if (= zoom 1.0) *om-default-font1* (om-zoom-scale-font *om-default-font1* zoom)))
+         (xm (max 1 (round (* 10 zoom))))
+         (ym (max 1 (round (* 10 zoom))))
+         (tmpBPF (create-bpf-with-initpt self)))
+    (om-with-focused-view view
+      (om-with-font scaled-font
+        (if (stringp (ctrltype self)) (om-draw-string xm ym (string (ctrltype self))))
+        (om-draw-rect 0 0 (- (w view) 1) (- (h view) 1))
+        (draw-obj-in-rect tmpBPF x x1 y y1 (give-bpf-range tmpBPF) view)
+        ))))
 
 
 

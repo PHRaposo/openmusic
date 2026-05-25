@@ -100,6 +100,7 @@
   )
 
 
+#|
 (defmethod om-draw-contents ((self miniview))
   (let ((box (object (om-view-container self))))
     (om-with-focused-view self
@@ -116,7 +117,7 @@
                (pic (get-fonde-pict (value box)))
                posi)
           (if pic
-              (om-draw-picture self pic 
+              (om-draw-picture self pic
                                :size (om-make-point (w self) (h self)))
             (om-with-fg-color self (or (get-fonde-color (value box))
                                        *om-light-gray-color*)
@@ -127,6 +128,47 @@
           ))
       (when (show-name box)
         (om-draw-string 4 (- (h self) 5) (name box)))
+|#
+
+(defmethod om-draw-contents ((self miniview))
+  (let* ((box  (object (om-view-container self)))
+         (zoom (om-zoom-find-ancestor-zoom self)))
+    (om-with-focused-view self
+      (if (showpict box)
+          (progn
+            (om-with-fg-color self *om-white-color*
+              (om-fill-rect 0 0 (w self) (h self)))
+            (draw-mini-view self (value box))
+            )
+        (let* ((icon (icon (reference box)))
+               (sizeicn (icon-sizes icon (def-icon-size box)))
+               (xi (if (and (numberp zoom) (/= zoom 1.0))
+                       (max 1 (round (* (car sizeicn) zoom)))
+                     (car sizeicn)))
+               (yi (if (and (numberp zoom) (/= zoom 1.0))
+                       (max 1 (round (* (cadr sizeicn) zoom)))
+                     (cadr sizeicn)))
+               (iconhdlr (second (get&corrige-icon icon)))
+               (pic (get-fonde-pict (value box)))
+               posi)
+          (if pic
+              (om-draw-picture self pic
+                               :size (om-make-point (w self) (h self)))
+            (om-with-fg-color self (or (get-fonde-color (value box))
+                                       *om-light-gray-color*)
+              (om-fill-rect 0 0 (w self) (h self))))
+          (when iconhdlr
+            (setf posi (om-make-point (- (round (w self) 2) (round xi 2)) (- (round (h self) 2) (round yi 2))))
+            (om-draw-picture self iconhdlr :pos posi :size (om-make-point xi yi)))
+          ))
+      (when (show-name box)
+        (let ((sname-font (if (and (numberp zoom) (/= zoom 1.0))
+                              (om-zoom-scale-font *om-default-font1* zoom)
+                            *om-default-font1*)))
+          (om-with-font sname-font
+            (om-draw-string (max 1 (round (* 4 zoom)))
+                            (- (h self) (max 1 (round (* 5 zoom))))
+                            (name box)))))
       (when (play-state box)
         (om-with-focused-view self
           (om-with-fg-color self *om-green2-color*
@@ -186,6 +228,7 @@
 (defmethod draw-mini-view  ((self t) (value t)) 
    (draw-obj-in-rect value 0 (w self) 0  (h self) (view-get-ed-params self) self))
 
+#|
 #-linux
 (defmethod draw-obj-in-rect ((self t) x x1 y y1 edparams view)
    (declare (ignore edparams))
@@ -199,14 +242,43 @@
                while (< y y1) do
                (om-draw-string (+ x 3) (- y 3) (format nil "~D : ~D" (car item) (second item)))
                (unless (= i (- length 1))
-                 (om-with-fg-color view *om-gray-color*   
+                 (om-with-fg-color view *om-gray-color*
                    (om-draw-line x y x1 y)))
                (setf y (+ y 15))))
        (om-draw-string (+ x 2) (+ y (round (- y1 y) 2) 4) (format nil "~D"  self)))))
+|#
+
+#-linux
+(defmethod draw-obj-in-rect ((self t) x x1 y y1 edparams view)
+  (declare (ignore edparams))
+  (let* ((zoom        (om-zoom-effective view))
+         (pen         (max 1 (round zoom)))
+         (scaled-font (if (= zoom 1.0) *om-default-font1* (om-zoom-scale-font *om-default-font1* zoom)))
+         (m2  (max 1 (round (* 2  zoom))))
+         (m3  (max 1 (round (* 3  zoom))))
+         (m4  (max 1 (round (* 4  zoom))))
+         (m15 (max 1 (round (* 15 zoom)))))
+    (om-with-focused-view view
+      (om-with-line-size pen
+        (om-with-font scaled-font
+          (if (omclass-p (class-of (class-of self)))
+              (let* ((thelist (name-values-list self))
+                     (length  (length thelist))
+                     (y       (+ y m15)))
+                (loop for item in thelist
+                      for i = 0 then (+ i 1)
+                      while (< y y1) do
+                      (om-draw-string (+ x m3) (- y m3) (format nil "~D : ~D" (car item) (second item)))
+                      (unless (= i (- length 1))
+                        (om-with-fg-color view *om-gray-color*
+                          (om-draw-line x y x1 y)))
+                      (setf y (+ y m15))))
+            (om-draw-string (+ x m2) (+ y (round (- y1 y) 2) m4) (format nil "~D"  self))))))))
 
 
 ;fix the overflooding strings from classes miniview
 ;width = 5 * (characters + whitespaces) approximatively
+#|
 #+linux
 (defmethod draw-obj-in-rect ((self t) x x1 y y1 edparams view)
   (declare (ignore edparams))
@@ -224,10 +296,42 @@
                         (om-draw-string (+ x 3) (- y 3) strg :end (- (floor (/ x1 5)) 3))
                       (om-draw-string (+ x 3) (- y 3) strg))
                     (unless (= i (- length 1))
-                      (om-with-fg-color view *om-gray-color*   
+                      (om-with-fg-color view *om-gray-color*
                         (om-draw-line x y x1 y)))
                     (setf y (+ y 15)))))
       (om-draw-string (+ x 2) (+ y (round (- y1 y) 2) 4) (format nil "~D"  self)))))
+|#
+
+#+linux
+(defmethod draw-obj-in-rect ((self t) x x1 y y1 edparams view)
+  (declare (ignore edparams))
+  (let* ((zoom        (om-zoom-effective view))
+         (pen         (max 1 (round zoom)))
+         (scaled-font (if (= zoom 1.0) *om-default-font1* (om-zoom-scale-font *om-default-font1* zoom)))
+         (m2  (max 1 (round (* 2  zoom))))
+         (m3  (max 1 (round (* 3  zoom))))
+         (m4  (max 1 (round (* 4  zoom))))
+         (m15 (max 1 (round (* 15 zoom)))))
+    (om-with-focused-view view
+      (om-with-line-size pen
+        (om-with-font scaled-font
+          (if (omclass-p (class-of (class-of self)))
+              (let* ((thelist (name-values-list self))
+                     (length  (length thelist))
+                     (y       (+ y m15)))
+                (loop for item in thelist
+                      for i = 0 then (+ i 1)
+                      while (< y y1) do
+                        (let* ((strg (format nil "~D : ~D" (car item) (second item)))
+                               (lgt (length strg)))
+                          (if (> (* lgt 5) x1)
+                              (om-draw-string (+ x m3) (- y m3) strg :end (- (floor (/ x1 5)) 3))
+                            (om-draw-string (+ x m3) (- y m3) strg))
+                          (unless (= i (- length 1))
+                            (om-with-fg-color view *om-gray-color*
+                              (om-draw-line x y x1 y)))
+                          (setf y (+ y m15)))))
+            (om-draw-string (+ x m2) (+ y (round (- y1 y) 2) m4) (format nil "~D"  self))))))))
 
 
 (defmethod print-mini-view  ((self t) (value t) tl br)

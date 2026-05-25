@@ -104,14 +104,33 @@ A TEMPO-MAP represents the tempo events and measure changes (also used as bar ma
 (defmethod draw-mini-view  ((self t) (value Tempo-Map)) 
    (draw-obj-in-rect value 0 (w self) 0  (h self) (view-get-ed-params self) self))
 
+#|
 (defmethod draw-obj-in-rect ((self Tempo-Map) x x1 y y1 edparams view)
    (om-with-focused-view view
      (loop for tpair in (tempo-evts self)
            for i = 1 then (+ i 1) do
-           (if (listp tpair) 
+           (if (listp tpair)
                (om-draw-string 10 (* 12 i) (format nil "~D: ~D" (car tpair) (cadr tpair)))
              (om-draw-string 10 (* 12 i) (format nil "Ill-formed time-value: ~D" tpair))
            ))))
+|#
+
+(defmethod draw-obj-in-rect ((self Tempo-Map) x x1 y y1 edparams view)
+  (let* ((zoom    (om-zoom-effective view))
+         (scale-p (and (numberp zoom) (/= zoom 1.0)))
+         (scaled-font (if scale-p (om-zoom-scale-font *om-default-font1* zoom) *om-default-font1*))
+         (xm     (if scale-p (max 1 (round (* 10 zoom))) 10))
+         (line-h (if scale-p (max 1 (round (* 12 zoom))) 12)))
+    (om-with-focused-view view
+      (flet ((body ()
+               (loop for tpair in (tempo-evts self)
+                     for i = 1 then (+ i 1) do
+                     (if (listp tpair)
+                         (om-draw-string xm (* line-h i) (format nil "~D: ~D" (car tpair) (cadr tpair)))
+                       (om-draw-string xm (* line-h i) (format nil "Ill-formed time-value: ~D" tpair))))))
+        (if scale-p
+            (om-with-font scaled-font (body))
+          (body))))))
 
 ;=== If a tempo-map can be extracted from an object,
 ;=== we are able to find time of begining of each measure

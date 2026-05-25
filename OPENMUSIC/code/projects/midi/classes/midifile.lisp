@@ -388,6 +388,7 @@ Note values are lists of (pitch date dur vel chan).
           for i = 0 then (+ i 1) do
           (draw-track-mini view track 0 dur (* i trackh) (* (1+ i) trackh)))))
 
+#|
 (defmethod draw-mini-view ((self miniview) (value MidiFile))
    (if (midifilename value)
      (om-with-focused-view self
@@ -395,6 +396,23 @@ Note values are lists of (pitch date dur vel chan).
      (om-with-focused-view self
        (om-draw-string 5 15 "No file attached"))
      ))
+|#
+
+(defmethod draw-mini-view ((self miniview) (value MidiFile))
+  (let* ((zoom        (om-zoom-effective self))
+         (scale-p     (and (numberp zoom) (/= zoom 1.0)))
+         (scaled-font (if scale-p (om-zoom-scale-font *om-default-font1* zoom) *om-default-font1*))
+         (xm (if scale-p (max 1 (round (* 5  zoom))) 5))
+         (ym (if scale-p (max 1 (round (* 15 zoom))) 15)))
+    (if (midifilename value)
+        (om-with-focused-view self
+          (draw-mini-midi self (real-dur value) value))
+      (om-with-focused-view self
+        (flet ((draw-text ()
+                 (om-draw-string xm ym "No file attached")))
+          (if scale-p
+              (om-with-font scaled-font (draw-text))
+            (draw-text)))))))
 
 
 

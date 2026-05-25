@@ -123,7 +123,9 @@
          frame)
     (setf (posy in) (om-point-v maqpos))
     (setf (offset in) (om-point-h maqpos))
-    (setf frame (make-frame-from-callobj in))
+    (setf frame (let ((*make-frame-zoom-context*
+                       (and (typep self 'om-scroller) (om-zoom-of self))))
+                  (make-frame-from-callobj in)))
     (omG-add-element self frame)
     ))
 
@@ -137,7 +139,9 @@
          frame)
     (setf (posy out) (om-point-v maqpos))
     (setf (offset out) (om-point-h maqpos))
-    (setf frame (make-frame-from-callobj out))
+    (setf frame (let ((*make-frame-zoom-context*
+                       (and (typep self 'om-scroller) (om-zoom-of self))))
+                  (make-frame-from-callobj out)))
     (omG-add-element self frame)
     ))
 

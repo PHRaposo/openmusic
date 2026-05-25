@@ -243,6 +243,7 @@
 
 (defmethod om-view-cursor ((self maq-c-resize-box)) (call-next-method))
 
+#|
 (defmethod add-box-resize ((self tempobjframe))
    (om-add-subviews self
                     (setf (resize-box self)
@@ -260,6 +261,29 @@
                     ;                    :position (om-make-point (- (w self) 8) 0)
                     ;                    ))
                     ))
+|#
+
+(defmethod add-box-resize ((self tempobjframe))
+   (let* ((zoom    (or *make-frame-zoom-context* 1.0))
+          (scale-p (and (numberp zoom) (/= zoom 1.0)))
+          (size-v  (if scale-p (max 1 (round (* 8 zoom))) 8))
+          (off-v   size-v))
+     (om-add-subviews self
+                      (setf (resize-box self)
+                            (om-make-view 'maq-c-resize-box
+                                          :size (om-make-point size-v size-v)
+                                          :position (om-make-point (- (w self) off-v) (- (h self) off-v))))
+                      ;(setf (bottomresize (resize-box self))
+                      ;      (om-make-view 'maq-b-resize-box
+                      ;                    :size (om-make-point (- (w self) 8) 8)
+                      ;                    :position (om-make-point 0 (- (h self) 8))
+                      ;                    ))
+                      ;(setf (rightresize (resize-box self))
+                      ;      (om-make-view 'maq-r-resize-box
+                      ;                    :size (om-make-point 8 (- (h self) 8))
+                      ;                    :position (om-make-point (- (w self) 8) 0)
+                      ;                    ))
+                      )))
 
 
 #|
@@ -387,6 +411,7 @@
         (om-draw-rect 1 1 (- (w self) 2) (- (h self) 2))  :pensize 5))))
 
 
+#|
 (defmethod score-draw-mini-view ((self tempobjframe) value)
   (ignore-errors
   (if (equal *minipict-mode* :pianoroll)
@@ -396,6 +421,27 @@
           (om-draw-picture self (minipict self) :pos (om-make-point x0 y0) :size pictsize))
       (om-with-focused-view self
         (draw-mini-obj value self (mv-font-size value) (mv-view-size value self)))))))
+|#
+
+(defmethod score-draw-mini-view ((self tempobjframe) value)
+  (ignore-errors
+   (let* ((zoom (om-zoom-of self))
+          (fs   (max 1 (round (* (mv-font-size value) zoom)))))
+     (if (equal *minipict-mode* :pianoroll)
+         (draw-mini-piano-roll value self (mv-view-size value self))
+       (if (minipict self)
+           (let ((x0 (initx self)) (y0 (inity self)) (pictsize (om-get-picture-size (minipict self))))
+             (om-draw-picture self (minipict self) :pos (om-make-point x0 y0) :size pictsize))
+         (om-with-focused-view self
+           (draw-mini-obj value self fs (mv-view-size value self))))))))
+
+
+(defmethod om-zoom-relayout-frame ((self tempobjframe))
+  ;; Drop cached miniview after inherited layout so it rebuilds at new zoom.
+  (call-next-method)
+  (when (minipict self)
+    (om-kill-picture (minipict self))
+    (setf (minipict self) nil)))
 
 
 (defmethod om-draw-contents ((self outtempobj))
@@ -807,6 +853,7 @@
 
 (defmethod allowed-lock-modes ((self temporalbox)) '("x" "&"))
 
+#|
 (defmethod add-lock-button ((self tempobjframe) &optional (mode "x"))
    "Mode lambda 'l' and refernce 'o' are forbidden for temporal boxes;"
    (when (find mode (allowed-lock-modes (object self)) :test 'string-equal)
@@ -825,6 +872,31 @@
                                                            ;(om-draw-contents item)
                                                            ))
                                              ))
+     (om-invalidate-view self)
+     (setf (allow-lock (object self)) mode)))
+|#
+
+(defmethod add-lock-button ((self tempobjframe) &optional (mode "x"))
+   "Mode lambda 'l' and refernce 'o' are forbidden for temporal boxes;"
+   (when (find mode (allowed-lock-modes (object self)) :test 'string-equal)
+     (let* ((zoom    (or *make-frame-zoom-context* (om-zoom-effective self) 1.0))
+            (scale-p (and (numberp zoom) (/= zoom 1.0)))
+            (size-v  (if scale-p (max 1 (round (* 10 zoom))) 10)))
+       (setf (lock-button self)  (om-make-view 'lock-button
+                                               :IconID (get-icon-lock mode)
+                                               :size (om-make-point size-v size-v)
+                                               :position (om-make-point 0 0)
+                                               :owner self
+                                               :action #'(lambda (item)
+                                                           (let* ((modes (allowed-lock-modes (object self)))
+                                                                  (mpos (position (mode item) modes :test 'string-equal))
+                                                                  (newmode (nth (mod (1+ mpos) (length modes)) modes)))
+                                                             (setf (mode item) newmode
+                                                                   (iconID item) (get-icon-lock newmode))
+                                                             (setf (allow-lock (object self)) newmode)
+                                                             ;(om-draw-contents item)
+                                                             ))
+                                               )))
      (om-invalidate-view self)
      (setf (allow-lock (object self)) mode)))
 
@@ -973,7 +1045,9 @@
        (loop for item in conec-to-me do
              (change-conections  object item newbox))
        (omg-remove-element container self)
-       (setf frame (make-frame-from-callobj newbox))
+       (setf frame (let ((*make-frame-zoom-context*
+                          (and (typep container 'om-scroller) (om-zoom-of container))))
+                     (make-frame-from-callobj newbox)))
        (omg-add-element  container frame)
        (compile-patch newpatch)
        (update-graphic-connections frame (get-elements (object container))))))
@@ -1015,7 +1089,9 @@
       (setf conec-to-me (get-conect-to-me object))
       (loop for item in conec-to-me do
             (change-conections  object item newbox))
-      (setf frame (make-frame-from-callobj newbox))
+      (setf frame (let ((*make-frame-zoom-context*
+                         (and (typep container 'om-scroller) (om-zoom-of container))))
+                    (make-frame-from-callobj newbox)))
       (omg-remove-element  container self)
       (compile-patch newpatch)
       (omg-add-element  container frame)

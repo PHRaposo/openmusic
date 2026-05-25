@@ -240,16 +240,34 @@ Exports as a raw bitmap (TIF format)
   (list (om-new-leafmenu "Make Box" #'(lambda () (bgk2pict object patch)))))
 
 
+#|
 (defmethod bgk2pict ((self patch-picture) patch)
   (let ((picture (copy-picture self 'picture))
         mynew-pict)
-     (setf newcall (omNG-make-new-boxcall (find-class 'picture) 
+     (setf newcall (omNG-make-new-boxcall (find-class 'picture)
                                           (om-subtract-points (pict-pos self) (om-make-point 0 8))
-                                          (mk-unique-name patch "pict")))  
+                                          (mk-unique-name patch "pict")))
      (setf (value newcall) picture)
      (setf (frame-size newcall) (om-add-points (pict-size self) (om-make-point 0 16)))
      (setf (showpict newcall) t)
      (omG-add-element patch (make-frame-from-callobj newcall))
+     (setf (pictu-list (object patch)) (remove self (pictu-list (object patch)) :test 'equal))
+     (om-invalidate-view patch t)))
+|#
+
+(defmethod bgk2pict ((self patch-picture) patch)
+  (let ((picture (copy-picture self 'picture))
+        mynew-pict)
+     (setf newcall (omNG-make-new-boxcall (find-class 'picture)
+                                          (om-subtract-points (pict-pos self) (om-make-point 0 8))
+                                          (mk-unique-name patch "pict")))
+     (setf (value newcall) picture)
+     (setf (frame-size newcall) (om-add-points (pict-size self) (om-make-point 0 16)))
+     (setf (showpict newcall) t)
+     (omG-add-element patch
+                      (let ((*make-frame-zoom-context*
+                             (and (typep patch 'om-scroller) (om-zoom-of patch))))
+                        (make-frame-from-callobj newcall)))
      (setf (pictu-list (object patch)) (remove self (pictu-list (object patch)) :test 'equal))
      (om-invalidate-view patch t)))
 
@@ -390,7 +408,7 @@ Exports as a raw bitmap (TIF format)
                 ;(setf (cadr *draw-text*) (concatenate 'string (cadr *draw-text*) (string #\Newline)))
                 (finish-text-extra self)
                 (report-modifications (editor self)))
-               ((characterp key) ;;; + eviter les caractères spéciaux !!
+               ((characterp key) ;;; + eviter les caractï¿½res spï¿½ciaux !!
                 (setf (cadr *draw-text*) (concatenate 'string (cadr *draw-text*) (string key)))
                 (report-modifications (editor self)))
                (t nil)))

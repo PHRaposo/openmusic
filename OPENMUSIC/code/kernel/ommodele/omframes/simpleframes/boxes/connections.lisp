@@ -253,25 +253,68 @@
 
 (defmethod connection-container ((self t)) (om-view-container self))
 
+#|
 (defmethod draw-connection ((self c-connection) val)
   (let* ((thepoints (copy-list (get-graph-points self)))
          (prim (pop thepoints))
          (sel? (selected? self))
          (color (if (zerop (ccolor self)) *om-black-color* (nth (-  (ccolor self) 1) *16-color-list*))))
-    (om-with-focused-view (connection-container (thebox self)) 
+    (om-with-focused-view (connection-container (thebox self))
       (om-with-fg-color nil color
 	(om-with-line-size (if sel? 2 1)
           (if val
               (loop while thepoints do
-                    (om-draw-line (om-point-h prim) (om-point-v prim) 
+                    (om-draw-line (om-point-h prim) (om-point-v prim)
                                   (om-point-h (car thepoints)) (om-point-v (car thepoints))
                                   :erasable (equal val 'redraw))
                     (setf prim (pop thepoints))
                     (when thepoints
                       (if (member prim (point-sel self))
                           (om-fill-rect (- (om-point-h  prim) 2) (- (om-point-v  prim) 2) 4 4 :erasable (equal val 'redraw))
-                        (when (and sel? (not (= 1 *connection-style*))) ;(not *curved-connections*
+                        (when (and sel? (not (= 1 *connection-style*)))
                           (om-draw-rect (- (om-point-h  prim) 2) (- (om-point-v  prim) 2) 4 4 :erasable (equal val 'redraw)))
+                        ))
+                    )
+            #-(and cocoa lispworks8)(loop while thepoints do
+                                          (om-erase-line (om-point-h  prim)
+                                                         (om-point-v  prim)
+                                                         (om-point-h (car thepoints))
+                                                         (om-point-v (car thepoints)))
+                                          (setf prim (pop thepoints))
+                                          (when thepoints
+                                            (if (member prim (point-sel self))
+                                                (om-erase-rect-content (- (om-point-h  prim) 2)
+                                                                       (- (om-point-v  prim) 2) 4 4)
+                                              (when sel?
+                                                (om-erase-rect (- (om-point-h  prim) 2) (- (om-point-v  prim) 2) 4 4))
+                                              )))
+            ))))))
+|#
+
+(defmethod draw-connection ((self c-connection) val)
+  (let* ((thepoints (copy-list (get-graph-points self)))
+         (prim (pop thepoints))
+         (sel? (selected? self))
+         (color (if (zerop (ccolor self)) *om-black-color* (nth (-  (ccolor self) 1) *16-color-list*)))
+         (zoom (om-zoom-effective (thebox self)))
+         (base-pen (if sel? 2 1))
+         (pen      (max 1 (round (* base-pen zoom))))
+         (mark     (max 1 (round (* 4 zoom))))
+         (mark-off (max 0 (round (* 2 zoom)))))
+    (om-with-focused-view (connection-container (thebox self))
+      (om-with-fg-color nil color
+	(om-with-line-size pen
+          (if val
+              (loop while thepoints do
+                    (om-draw-line (om-point-h prim) (om-point-v prim)
+                                  (om-point-h (car thepoints)) (om-point-v (car thepoints))
+                                  :erasable (equal val 'redraw))
+                    (setf prim (pop thepoints))
+                    (when thepoints
+                      (if (member prim (point-sel self))
+                          (om-fill-rect (- (om-point-h  prim) mark-off) (- (om-point-v  prim) mark-off) mark mark :erasable (equal val 'redraw))
+                        (when (and sel? (not (= 1 *connection-style*)))
+                          (om-draw-rect (- (om-point-h  prim) mark-off) (- (om-point-v  prim) mark-off) mark mark :erasable (equal val 'redraw)))
                         ))
                     )
             #-(and cocoa lispworks8)(loop while thepoints do

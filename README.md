@@ -17,6 +17,31 @@ Designed and developed by the IRCAM [Music Representation research group](http:/
 © 1998 - 2025 Carlos Agon, Gérard Assayag, Jean Bresson, Karim Haddad.
 
 
+## Zoom Implementation
+
+This branch introduces an **experimental** zoom feature for OM editors. The implementation is functional but **not bug-free** — known issues are listed below and tracked in the development notes.
+
+### Gestures and shortcuts
+
+- **Touch gesture** (trackpad pinch) — zoom in/out the patch editor.
+- **Shift + touch** — horizontal scroll (Windows only).
+- **Ctrl + mouse wheel** — zoom in/out (Windows only).
+- **Zoom bar** — top-of-editor widget with `+in` / `+out` buttons (where applicable) and a percent pop-up for direct zoom selection.
+- **Keyboard shortcuts**:
+  - `Ctrl +` — zoom in
+  - `Ctrl -` — zoom out
+  - `Ctrl 0` — reset to 100%
+
+### Status
+
+- Patch editor and score editor (and editors that inherit from them) — zoom-aware.
+- Maquette editor — keeps its own native zoom; the generic zoom bar does not apply.
+- Box icons (miniviews) in the patch — scale with the parent patch zoom (e.g. BPF, BPC, board, array, sound).
+- Music editor: temporary zoom (canvas scaling). **todo**: scale musical fonts.
+- Fluid interface boxes and dialog-item interface boxes — partial. **todo**: complete fixes.
+- **todo**: extend zoom to other editors.
+
+
 ## Sources and Licensing
 
 OpenMusic is a free software distributed under the GPLv3 license. As a Common Lisp program, the environment can be considered just as an extension of Lisp including the specific built-in features of the application. 

@@ -223,11 +223,22 @@
       (draw-send-box self (object container))
       )))
 
+#|
 (defmethod draw-send-box ((container t) object)
   (om-with-focused-view container
     (om-with-font *om-default-font1b*
                   (om-draw-string (- (round (w container) 2) 7) 12 (format () "~2D" (indice object))))
     ))
+|#
+
+(defmethod draw-send-box ((container t) object)
+  (let* ((zoom (om-zoom-effective container))
+         (offx (max 1 (round (* 7  zoom))))
+         (offy (max 1 (round (* 12 zoom)))))
+    (om-with-focused-view container
+      (om-with-font (om-current-default-font1b container)
+        (om-draw-string (- (round (w container) 2) offx) offy
+                        (format () "~2D" (indice object)))))))
 
 ;;;;;from patchcontainer
 
@@ -240,7 +251,10 @@
             (pos (or position (om-make-point (+ 5 (* i 50)) 240)))
             (newsend (make-new-send (mk-unique-name self "send") i pos t))
             )
-       (omG-add-element self (make-frame-from-callobj newsend))
+       (omG-add-element self
+                        (let ((*make-frame-zoom-context*
+                               (and (typep self 'om-scroller) (om-zoom-of self))))
+                          (make-frame-from-callobj newsend)))
        (set-field-size self)
        )))
 
@@ -269,7 +283,10 @@
      
        (when target
          (setf newobj (eval (omng-replicate (object self) (borne-position new-position))))
-         (omG-add-element target (make-frame-from-callobj newobj))))
+         (omG-add-element target
+                          (let ((*make-frame-zoom-context*
+                                 (and (typep target 'om-scroller) (om-zoom-of target))))
+                            (make-frame-from-callobj newobj)))))
      (call-next-method)))
 
 ; all section from in-out-boxes starting from Dialogs (for renaming+ info panel)
@@ -443,11 +460,22 @@
       (draw-send-receive-box self (object container))
       )))
 
+#|
 (defmethod draw-send-receive-box ((container t) object)
   (om-with-focused-view container
     (om-with-font *om-default-font1b*
                   (om-draw-string (- (round (w container) 2) 7) 12 (format () "~2D" (indice object))))
     ))
+|#
+
+(defmethod draw-send-receive-box ((container t) object)
+  (let* ((zoom (om-zoom-effective container))
+         (offx (max 1 (round (* 7  zoom))))
+         (offy (max 1 (round (* 12 zoom)))))
+    (om-with-focused-view container
+      (om-with-font (om-current-default-font1b container)
+        (om-draw-string (- (round (w container) 2) offx) offy
+                        (format () "~2D" (indice object)))))))
 
 
 

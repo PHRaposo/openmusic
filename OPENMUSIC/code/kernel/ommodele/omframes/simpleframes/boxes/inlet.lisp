@@ -122,10 +122,11 @@
 ;;; pour montrer ou pas les valeurs des inputs
 (defvar *show-input-vals* t)
 
-;;; new : textenterview container = panel 
+#|
+;;; new : textenterview container = panel
 (defmethod om-view-mouse-enter-handler ((self input-funboxframe))
-    ;(oa::print-point (om-view-position (om-view-container self))) 
-  (let ((txty (if *mag-in-out* (progn (setf (iconid self) 1550) -20) -16)))                                 
+    ;(oa::print-point (om-view-position (om-view-container self)))
+  (let ((txty (if *mag-in-out* (progn (setf (iconid self) 1550) -20) -16)))
     (unless (or (and (connected? (object self)) (not (keyword-input-p (object self)))) (not *show-input-vals*))
       (om-without-interrupts
         (when (and self (om-view-container self))
@@ -150,21 +151,97 @@
         (om-set-view-position self (om-make-point (- xpos 2) (- ypos 5))))))
   #+win32(update-for-subviews-changes (om-view-container self) t)
   )
+|#
 
+;;; new : textenterview container = panel
+(defmethod om-view-mouse-enter-handler ((self input-funboxframe))
+  (let ((zoom (om-zoom-effective self)))
+    (when *mag-in-out* (setf (iconid self) 1550))
+    (unless (or (and (connected? (object self)) (not (keyword-input-p (object self))))
+                (not *show-input-vals*))
+      (om-without-interrupts
+        (when (and self (om-view-container self))
+          (let* ((box       (om-view-container self))
+                 (thetext   (format () "~S" (value (object self))))
+                 (panel     (om-view-container box))
+                 (container (editor panel))
+                 (font      (if (= zoom 1.0) *om-default-font1*
+                                (om-zoom-scale-font *om-default-font1* zoom)))
+                 (raw-w     (get-name-size thetext font))
+                 (tt-w      (if (and (numberp raw-w) (>= raw-w 20))
+                                raw-w
+                                (max 20 (round (* (+ 2 (length thetext)) 8 zoom)))))
+                 (tt-h      (round (* 20 zoom)))
+                 (box-pos   (om-view-position box))
+                 (input-x   (x self))
+                 (input-y   (y self))
+                 (tt-x      (- (+ (om-point-x box-pos) input-x) 4))
+                 (tt-y      (- (+ (om-point-y box-pos) input-y) tt-h 2)))
+            (when (text-view container)
+              (exit-from-dialog (text-view container) (om-dialog-item-text (text-view container))))
+            (let ((prev-lock (oa::locked panel)))
+              (setf (oa::locked panel) t)
+              (unwind-protect
+                  (let ((tv (om-make-dialog-item 'text-enter-view
+                                                 (om-make-point tt-x tt-y)
+                                                 (om-make-point tt-w tt-h)
+                                                 thetext
+                                                 :container panel
+                                                 :font font)))
+                    (om-set-font tv font)
+                    (setf (text-view container) tv))
+                (setf (oa::locked panel) prev-lock)))))))
+    (when *mag-in-out*
+      (let* ((big  (round (* 12 zoom)))
+             (off2 (round (* 2  zoom)))
+             (off5 (round (* 5  zoom)))
+             (pos  (om-view-position self))
+             (ypos (om-point-y pos))
+             (xpos (om-point-x pos)))
+        (om-set-view-size self (om-make-point big big))
+        (om-set-view-position self (om-make-point (- xpos off2) (- ypos off5)))))
+    #+win32(capi:redraw-pinboard-object self)))
+
+#|
 ;;;new : text-view is on the panel
-(defmethod om-view-mouse-leave-handler ((self input-funboxframe)) 
+(defmethod om-view-mouse-leave-handler ((self input-funboxframe))
  ; (redraw-frame (om-view-container self)); peut-etre cela ?
   (when *mag-in-out*
     (setf (iconid self) (frame-icon-input self))
     (om-set-view-size self (om-make-point 8 8))
     (om-set-view-position self (om-make-point (+ (om-point-x (om-view-position self)) 2) 1)))
-  (om-without-interrupts 
+  (om-without-interrupts
     (let* ((container (editor (om-view-container (om-view-container self)))))
       (when (and container (text-view container) (equal (class-name (class-of (text-view container))) 'text-enter-view))
         (om-remove-subviews (panel container) (text-view container))
         (setf (text-view container) nil))))
   #+win32(update-for-subviews-changes (om-view-container self) t)
   )
+|#
+
+;;;new : text-view is on the panel
+(defmethod om-view-mouse-leave-handler ((self input-funboxframe))
+  (when *mag-in-out*
+    (let* ((zoom  (om-zoom-effective self))
+           (small (round (* 8 zoom)))
+           (off2  (round (* 2 zoom)))
+           (off1  (round (* 1 zoom))))
+      (setf (iconid self) (frame-icon-input self))
+      (om-set-view-size self (om-make-point small small))
+      (om-set-view-position self (om-make-point (+ (om-point-x (om-view-position self)) off2)
+                                                off1))))
+  (om-without-interrupts
+    (let* ((container (editor (om-view-container (om-view-container self)))))
+      (when (and container (text-view container) (equal (class-name (class-of (text-view container))) 'text-enter-view))
+        (let* ((p         (panel container))
+               (prev-lock (and p (oa::locked p))))
+          (when p (setf (oa::locked p) t))
+          (unwind-protect
+              (progn
+                (om-remove-subviews p (text-view container))
+                (setf (text-view container) nil))
+            (when p (setf (oa::locked p) prev-lock)))))))
+  #+win32(capi:redraw-pinboard-object self))
 
 
 (defclass input-text-enter-view (edit-text-enter-view) ())
@@ -190,21 +267,26 @@
      ((and (om-shift-key-p) (keyword-input-p (object self)) (val-menu (object self)))
       (popup-keyword-val-menu (object self) panel))
       
-     ((and (om-shift-key-p) (not (maquette-p (object container)))) 
-      (let* ((new-obj (omNG-make-new-boxcall (car *Basic-Lisp-Types*)
-                                             (om-make-point (+ (x (om-view-container self)) (x self))
-                                                            (- (y (om-view-container self)) 30))
+     ((and (om-shift-key-p) (not (maquette-p (object container))))
+      (let* ((zoom    (if (typep panel 'om-scroller) (om-zoom-of panel) 1.0))
+             (vis-pos (om-make-point (+ (x (om-view-container self)) (x self))
+                                     (- (y (om-view-container self)) 30)))
+             (pos     (if (= zoom 1.0) vis-pos (om-zoom-unscale-point vis-pos zoom)))
+             (new-obj (omNG-make-new-boxcall (car *Basic-Lisp-Types*)
+                                             pos
                                              (mk-unique-name panel "aux")))
+             (target  (om-view-container (om-view-container self)))
              new-frame)
         (setf (value new-obj) (get-input-value (object self)))
         (setf (thestring new-obj) (format () "~S" (value new-obj)))
         (setf (frame-size new-obj) (om-make-point (get-name-size (thestring new-obj)) 28))
-        (setf new-frame (make-frame-from-callobj new-obj))
-        (omG-add-element (om-view-container (om-view-container self)) new-frame)
+        (setf new-frame (let ((*make-frame-zoom-context*
+                               (and (typep target 'om-scroller) (om-zoom-of target))))
+                          (make-frame-from-callobj new-obj)))
+        (omG-add-element target new-frame)
         (connect-box (car (outframes new-frame)) self)
         (open-ttybox (iconview new-frame))
-        #+linux(capi:redisplay-element (om-view-container (om-view-container self)))
-        ))
+        #+linux(capi:redisplay-element target)))
 
      ((menu-input-p (object self))
       (popup-input-menu (object self) panel))
@@ -217,18 +299,22 @@
           (when (text-view container)
             (om-remove-subviews panel (text-view container))
             (setf (text-view container) nil))
-          (let ((thetext (format () "~S" (value (object self)))))
+          (let* ((thetext (format () "~S" (value (object self))))
+                 (zoom    (if (typep panel 'om-scroller) (om-zoom-of panel) 1.0))
+                 (font    (if (= zoom 1.0) *om-default-font1* (om-zoom-scale-font *om-default-font1* zoom)))
+                 (off-y   (round (* -26 zoom)))
+                 (tth     (round (* 16  zoom))))
             (setf (text-view container) (om-make-dialog-item 'input-text-enter-view
                                                              (om-add-points (om-view-position (om-view-container self))
-                                                                            (om-make-point (x self) -26))
-                                                             (om-make-point (get-name-size thetext) 16)
+                                                                            (om-make-point (x self) off-y))
+                                                             (om-make-point (get-name-size thetext font) tth)
                                                              thetext
                                                              :allow-returns nil
                                                              :di-selected-p t
                                                              :focus t
                                                              :object self
                                                              :container panel
-                                                             :font *om-default-font1*))))))))
+                                                             :font font))))))))
   
 ;-------
 
@@ -279,9 +365,10 @@
 (defmethod copy ((self text-enter-view)) nil)
 (defmethod paste ((self text-enter-view)) nil)
 
+#|
 ;;;new : text-view is on the panel
 (defmethod exit-from-dialog ((self edit-text-enter-view) newtext)
-  (handler-bind ((error #'(lambda (c) (declare (ignore c)) 
+  (handler-bind ((error #'(lambda (c) (declare (ignore c))
                             (setf (text-view (editor (om-view-container self))) nil)
                             (om-remove-subviews (panel (editor (om-view-container self))) self)
                             (om-beep)
@@ -295,6 +382,45 @@
          (setf (value fun-input) (read-from-string newtext)))
        (setf (text-view (editor (om-view-container self))) nil)
        (om-remove-subviews (panel (editor (om-view-container self))) self))))
+|#
+
+;;;new : text-view is on the panel
+(defmethod exit-from-dialog ((self edit-text-enter-view) newtext)
+  (let* ((fun-input (object (object self)))
+         (keyword?  (keyword-input-p fun-input)))
+    (cond
+     (keyword?
+      (handler-bind ((error #'(lambda (c)
+                                (format *om-stream*
+                                        "~&[exit-from-dialog edit-text/keyword ERROR] ~A~%   condition-type=~S~%"
+                                        (princ-to-string c) (type-of c))
+                                (finish-output *om-stream*)
+                                (om-dismiss-ttybox-view self)
+                                (om-beep)
+                                (om-abort))))
+        (let ((*package* (find-package :om)))
+          (set-new-keyword fun-input newtext)
+          (om-view-set-help (object self)
+                            (string+ "<" (string-downcase (name (object (object self)))) "> "))
+          (setf (text-view (editor (om-view-container self))) nil)
+          (om-remove-subviews (panel (editor (om-view-container self))) self))))
+     ((not (om-str-parseable-as-lisp-p newtext))
+      (om-dismiss-ttybox-view self)
+      (om-warn-unreadable-materialize)
+      (om-abort))
+     (t
+      (handler-bind ((error #'(lambda (c)
+                                (format *om-stream*
+                                        "~&[exit-from-dialog edit-text/value ERROR] ~A~%   condition-type=~S~%"
+                                        (princ-to-string c) (type-of c))
+                                (finish-output *om-stream*)
+                                (om-dismiss-ttybox-view self)
+                                (om-beep)
+                                (om-abort))))
+        (let ((*package* (find-package :om)))
+          (setf (value fun-input) (read-from-string newtext))
+          (setf (text-view (editor (om-view-container self))) nil)
+          (om-remove-subviews (panel (editor (om-view-container self))) self)))))))
 
 ;-------------------------------------------
 

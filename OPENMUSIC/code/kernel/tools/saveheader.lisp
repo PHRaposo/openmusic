@@ -48,13 +48,16 @@
   (write-line "; End File Header" file))
 
 ; return default header for obj
-(defmethod header-comment-from-obj ((self t)) 
+(defmethod header-comment-from-obj ((self t))
   (let* ((icon (icon self))
-        (ftype (obj-file-type self))
-        (version (omversion self))
-        (wspar (om-save-point-list (ensure-ws-params self)))
-        (params (list version ftype (first wspar) (second wspar) (third wspar) (str-without-nl (doc self)) (save-icon icon) 0
-                      (car (create-info self)) (cadr (create-info self)))))
+         (ftype (obj-file-type self))
+         (version (omversion self))
+         (ws (ensure-ws-params self))
+         (wspar (om-save-point-list (subseq ws 0 (min 3 (length ws)))))
+         (zoom (get-win-zoom self))
+         (params (list version ftype (first wspar) (second wspar) (third wspar) (str-without-nl (doc self)) (save-icon icon) 0
+                       (car (create-info self)) (cadr (create-info self))
+                       zoom)))
     (string+ ";" (format nil " ~S" params))))
 
 ; create-file for obj

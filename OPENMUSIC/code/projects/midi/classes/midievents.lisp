@@ -76,12 +76,30 @@ Lists of MIDIEvents can be extracted form other OM objects using GET-MIDIEVENTS.
 (defmethod update-miniview ((self t) (value MidiEvent)) 
    (om-invalidate-view self t))
 
+#|
 (defmethod draw-obj-in-rect ((self MidiEvent) x x1 y y1 edparams view)
    (om-with-focused-view view
      (om-draw-rect 0 0 (w view) (h view)  )
      (om-draw-string 10 20 "MIDI Event")
      (om-draw-string 10 30 (string (ev-type self)))
 ))
+|#
+
+(defmethod draw-obj-in-rect ((self MidiEvent) x x1 y y1 edparams view)
+  (let* ((zoom        (om-zoom-effective view))
+         (scale-p     (and (numberp zoom) (/= zoom 1.0)))
+         (scaled-font (if scale-p (om-zoom-scale-font *om-default-font1* zoom) *om-default-font1*))
+         (xm  (if scale-p (max 1 (round (* 10 zoom))) 10))
+         (y1l (if scale-p (max 1 (round (* 20 zoom))) 20))
+         (y2l (if scale-p (max 1 (round (* 30 zoom))) 30)))
+    (om-with-focused-view view
+      (om-draw-rect 0 0 (w view) (h view))
+      (flet ((draw-text ()
+               (om-draw-string xm y1l "MIDI Event")
+               (om-draw-string xm y2l (string (ev-type self)))))
+        (if scale-p
+            (om-with-font scaled-font (draw-text))
+          (draw-text))))))
 
 (defmethod draw-mini-view  ((self t) (value MidiEvent)) 
    (draw-obj-in-rect value 0 (w self) 0  (h self) (view-get-ed-params self) self))

@@ -52,21 +52,43 @@
    ( (= num 0) self)
    ((= num 1) (rep-board-data (cdr (reverse (data self)))))))
 
+#|
 (defmethod draw-obj-in-rect ((self  board) x x1 y y1 edparams  view)
   (let ((data (data self)) datax daty last-pt x0 y0)
     (when data
       (setf data (mat-trans data))
       (setf datax (om-scale (first data) 0 (- x1 x) (apply 'min (first data)) (apply 'max (first data))))
       (setf datay (om-scale (second data) 0 (- y1 y) (apply 'min (second data)) (apply 'max (second data))))
-        (setf x0 (round (+ x (car datax))) 
+        (setf x0 (round (+ x (car datax)))
               y0 (round (+ y (car datay))))
         (om-with-focused-view view
-          (om-with-fg-color view (bcolor self) 
+          (om-with-fg-color view (bcolor self)
             (loop for xp in (cdr datax)
                   for yp in (cdr datay) do
                   (om-draw-line x0 y0  (round (+ x xp)) (round (+ y yp)))
-                  (setf x0 (round (+ x xp)) 
+                  (setf x0 (round (+ x xp))
                         y0 (round (+ y yp)))))))))
+|#
+
+(defmethod draw-obj-in-rect ((self  board) x x1 y y1 edparams  view)
+  (let* ((zoom (om-zoom-effective view))
+         (pen  (max 1 (round zoom)))
+         (data (data self)) datax daty last-pt x0 y0)
+    (declare (ignore daty last-pt))
+    (when data
+      (setf data (mat-trans data))
+      (setf datax (om-scale (first data) 0 (- x1 x) (apply 'min (first data)) (apply 'max (first data))))
+      (setf datay (om-scale (second data) 0 (- y1 y) (apply 'min (second data)) (apply 'max (second data))))
+        (setf x0 (round (+ x (car datax)))
+              y0 (round (+ y (car datay))))
+        (om-with-focused-view view
+          (om-with-line-size pen
+            (om-with-fg-color view (bcolor self)
+              (loop for xp in (cdr datax)
+                    for yp in (cdr datay) do
+                    (om-draw-line x0 y0  (round (+ x xp)) (round (+ y yp)))
+                    (setf x0 (round (+ x xp))
+                          y0 (round (+ y yp))))))))))
 
 (defmethod* Objfromobjs ((Self board) (Type bpf))
   (let* ((data (rep-board-data (cdr (reverse (data self)))))

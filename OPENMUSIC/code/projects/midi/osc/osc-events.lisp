@@ -56,6 +56,7 @@ Note: default host 127.0.0.1 is the 'localhost', i.e. the message is send to the
 (defmethod update-miniview ((self t) (value OSCEvent)) 
    (om-invalidate-view self t))
 
+#|
 (defmethod draw-obj-in-rect ((self OSCEvent) x x1 y y1 edparams view)
    (om-with-focused-view view
      (om-draw-rect 0 0 (w view) (h view))
@@ -63,6 +64,25 @@ Note: default host 127.0.0.1 is the 'localhost', i.e. the message is send to the
      (om-draw-string 10 30 (string+ (host self) " - " (integer-to-string (port self))))
      (om-draw-string 10 40 (format nil "~s" (bundle self)))
 ))
+|#
+
+(defmethod draw-obj-in-rect ((self OSCEvent) x x1 y y1 edparams view)
+  (let* ((zoom        (om-zoom-effective view))
+         (scale-p     (and (numberp zoom) (/= zoom 1.0)))
+         (scaled-font (if scale-p (om-zoom-scale-font *om-default-font1* zoom) *om-default-font1*))
+         (xm  (if scale-p (max 1 (round (* 10 zoom))) 10))
+         (y1l (if scale-p (max 1 (round (* 20 zoom))) 20))
+         (y2l (if scale-p (max 1 (round (* 30 zoom))) 30))
+         (y3l (if scale-p (max 1 (round (* 40 zoom))) 40)))
+    (om-with-focused-view view
+      (om-draw-rect 0 0 (w view) (h view))
+      (flet ((draw-text ()
+               (om-draw-string xm y1l "OSC Event")
+               (om-draw-string xm y2l (string+ (host self) " - " (integer-to-string (port self))))
+               (om-draw-string xm y3l (format nil "~s" (bundle self)))))
+        (if scale-p
+            (om-with-font scaled-font (draw-text))
+          (draw-text))))))
 
 (defmethod draw-mini-view  ((self t) (value OSCEvent)) 
    (draw-obj-in-rect value 0 (w self) 0  (h self) (view-get-ed-params self) self))

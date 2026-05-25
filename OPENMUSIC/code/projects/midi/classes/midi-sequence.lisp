@@ -123,26 +123,58 @@ The structure is similar to that of a CHORD-SEQ: each parameters are specified b
 (defmethod draw-mini-view  ((self t) (value EventMidi-seq)) 
    (draw-obj-in-rect value 0 (w self) 0 (h self) (view-get-ed-params self) self))
 
+#|
 (defmethod draw-obj-in-rect ((self EventMidi-seq) x x1 y y1 edparams view)
     (let ((mid (round (/ (h view) 2)))
-           (long (w view)) 
+           (long (w view))
            l f dur xpt)
       (om-with-focused-view view
         (om-draw-string 10 15 (if (stringp (name self)) (name self) "MidiEvents sequence"))
         (om-draw-rect 0 0 (w view) (h view)  )
         (om-draw-line 0 mid (w view) mid)
-        (unless (empty-midiseq-p self)   
+        (unless (empty-midiseq-p self)
            (setf l (nth (- (length (LDate self)) 1) (Ldate self)))
            (setf f (nth 0 (lDate self)))
            (setf dur (- l f))
            (if (= dur 0)
                (om-draw-line (round (/ (w view) 2)) (+ mid 5) (round (/ (w view) 2)) (- mid 5))
-             (loop for date in (Ldate self) do 
+             (loop for date in (Ldate self) do
                        (setf xpt (round (* long (/ date dur))))
                        (om-draw-line xpt (+ mid 2) xpt (- mid 2))
                        )
              )
            ))))
+|#
+
+(defmethod draw-obj-in-rect ((self EventMidi-seq) x x1 y y1 edparams view)
+  (let* ((zoom        (om-zoom-effective view))
+         (scale-p     (and (numberp zoom) (/= zoom 1.0)))
+         (scaled-font (if scale-p (om-zoom-scale-font *om-default-font1* zoom) *om-default-font1*))
+         (text-x      (if scale-p (max 1 (round (* 10 zoom))) 10))
+         (text-y      (if scale-p (max 1 (round (* 15 zoom))) 15))
+         (long-tick   (if scale-p (max 1 (round (* 5 zoom))) 5))
+         (short-tick  (if scale-p (max 1 (round (* 2 zoom))) 2))
+         (mid (round (/ (h view) 2)))
+         (long (w view))
+         l f dur xpt)
+    (om-with-focused-view view
+      (flet ((draw-name ()
+               (om-draw-string text-x text-y (if (stringp (name self)) (name self) "MidiEvents sequence"))))
+        (if scale-p
+            (om-with-font scaled-font (draw-name))
+          (draw-name)))
+      (om-draw-rect 0 0 (w view) (h view))
+      (om-draw-line 0 mid (w view) mid)
+      (unless (empty-midiseq-p self)
+        (setf l (nth (- (length (LDate self)) 1) (Ldate self)))
+        (setf f (nth 0 (lDate self)))
+        (setf dur (- l f))
+        (if (= dur 0)
+            (om-draw-line (round (/ (w view) 2)) (+ mid long-tick) (round (/ (w view) 2)) (- mid long-tick))
+          (loop for date in (Ldate self) do
+                (setf xpt (round (* long (/ date dur))))
+                (om-draw-line xpt (+ mid short-tick) xpt (- mid short-tick))
+                ))))))
 
 
 (defmethod execption-save-p ((self eventmidi-seq)) 'eventmidi-seq)

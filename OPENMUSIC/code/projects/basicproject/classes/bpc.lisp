@@ -113,6 +113,7 @@ If <x-list> and <y-list> are not of the same length, the last step in the shorte
 ;drawing
 
 
+#|
 (defmethod draw-obj-in-rect ((self bpc) x x1 y y1 edparams view)
   (om-with-focused-view view
     (om-with-fg-color view (bpfcolor self)
@@ -136,6 +137,40 @@ If <x-list> and <y-list> are not of the same length, the last step in the shorte
                               (+ x (om-point-h next-pixel)) (+ y (om-point-v next-pixel))))))
           (when draw-points
             (om-fill-rect (+ x (- (om-point-h pix-point) 1)) (+ y (- (om-point-v pix-point) 1)) 3 3)))))))
+|#
+
+(defmethod draw-obj-in-rect ((self bpc) x x1 y y1 edparams view)
+  (let* ((zoom (om-zoom-effective view))
+         (pen  (max 1 (round zoom)))
+         (*om-zoom-mini-helper-scale* zoom))
+    (declare (special *om-zoom-mini-helper-scale*))
+    (om-with-focused-view view
+      (om-with-line-size pen
+        (om-with-fg-color view (bpfcolor self)
+          (draw-bpc-in-rect self x x1 y y1 (give-bpf-range self)))))))
+
+(defun draw-bpc-in-rect (bpf x x1 y y1 ranges)
+  (declare (special *om-zoom-mini-helper-scale*))
+  (let* ((pl (length (point-list bpf)))
+         (draw-points (< pl 50))
+         (s    (if (boundp '*om-zoom-mini-helper-scale*) *om-zoom-mini-helper-scale* 1.0))
+         (mark (max 1 (round (* 3 s))))
+         (off  (max 0 (round s))))
+    (if (= 1 pl)
+        (let* ((pix-point (point-to-pixel-with-sizes ranges (car (point-list bpf)) (- x1 x) (- y1 y))))
+          (om-fill-rect (+ x (- (om-point-h pix-point) off)) (+ y (- (om-point-v pix-point) off)) mark mark))
+      (loop for thepoint in (point-list bpf)
+        for i = 0 then (+ i 1) do
+        (let* ((pix-point (point-to-pixel-with-sizes ranges thepoint (- x1 x) (- y1 y)))
+               (next-point (nth (+ i 1) (point-list bpf)))
+               (lines t))
+          (when lines
+            (when next-point
+              (let ((next-pixel (point-to-pixel-with-sizes ranges next-point (- x1 x) (- y1 y))))
+                (om-draw-line (+ x (om-point-h pix-point)) (+ y (om-point-v pix-point))
+                              (+ x (om-point-h next-pixel)) (+ y (om-point-v next-pixel))))))
+          (when draw-points
+            (om-fill-rect (+ x (- (om-point-h pix-point) off)) (+ y (- (om-point-v pix-point) off)) mark mark)))))))
 
 
 
@@ -150,6 +185,7 @@ If <x-list> and <y-list> are not of the same length, the last step in the shorte
 
 The precision of the BPC-Lib and editor is the maximum precision (<decimals> value) of the BPCs included."))
 
+#|
 (defmethod draw-obj-in-rect ((self  bpc-lib) x x1 y y1 edparams view)
    (let* ((bpf-list (bpf-list self))
           (ranges (get-miniview-bpf-range bpf-list)))
@@ -157,6 +193,20 @@ The precision of the BPC-Lib and editor is the maximum precision (<decimals> val
        (loop for bpf in bpf-list do
              (om-with-fg-color view (bpfcolor bpf)
                (draw-bpc-in-rect bpf x x1 y y1 ranges))))))
+|#
+
+(defmethod draw-obj-in-rect ((self  bpc-lib) x x1 y y1 edparams view)
+  (let* ((zoom     (om-zoom-effective view))
+         (pen      (max 1 (round zoom)))
+         (bpf-list (bpf-list self))
+         (ranges   (get-miniview-bpf-range bpf-list))
+         (*om-zoom-mini-helper-scale* zoom))
+    (declare (special *om-zoom-mini-helper-scale*))
+    (om-with-focused-view view
+      (om-with-line-size pen
+        (loop for bpf in bpf-list do
+              (om-with-fg-color view (bpfcolor bpf)
+                (draw-bpc-in-rect bpf x x1 y y1 ranges)))))))
 
 
 

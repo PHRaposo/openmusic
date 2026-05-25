@@ -437,6 +437,14 @@ Packages panels contains icons of sub-packages, classes and sometimes slots.#end
 ;To enable reoppening (linux editor)
 
 #+linux
-(defmethod close-editorFrame ((self packageeditor)) 
+(defmethod close-editorFrame ((self packageeditor))
       (setf (Editorframe (object self)) nil)
     (call-next-method))
+
+
+;; Icon browser: opts out of the canvas zoom (see nonrelationcontainer.lisp).
+(defmethod om-zoom-of ((pane PackagePanel)) 1.0)
+(defmethod (setf om-zoom-of) (value (pane PackagePanel))
+  (declare (ignore value)) 1.0)
+
+(defmethod om-zoom-applies-p ((pane PackagePanel)) nil)

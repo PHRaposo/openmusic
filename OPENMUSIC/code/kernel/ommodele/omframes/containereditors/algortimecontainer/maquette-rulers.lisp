@@ -52,10 +52,13 @@
        (make-move-after container frames))))
 
 (defmethod add-new-marquer  ((self maq-ruler) where)
-  (let* ((x (om-point-h (pixel2point (assoc-view self) where))))
-    (omg-add-element (assoc-view self) 
-                     (make-frame-from-callobj (omNG-make-new-marker (om-make-point (om-point-h where) (- (h (assoc-view self)) 26))
-                                                                    (mk-unique-name (assoc-view self) "marker") x)))))
+  (let* ((x (om-point-h (pixel2point (assoc-view self) where)))
+         (target (assoc-view self)))
+    (omg-add-element target
+                     (let ((*make-frame-zoom-context*
+                            (and (typep target 'om-scroller) (om-zoom-of target))))
+                       (make-frame-from-callobj (omNG-make-new-marker (om-make-point (om-point-h where) (- (h target) 26))
+                                                                      (mk-unique-name target "marker") x))))))
 
 (defmethod om-view-cursor ((self maq-ruler))
  (if (om-add-key-p) *mark* (call-next-method)))
@@ -181,10 +184,13 @@
 
 
 (defmethod add-new-marquer  ((self metric-ruler) where)
-  (let* ((x (om-point-h (pixel2point (assoc-view self) where))))
-    (omg-add-element (assoc-view self) 
-                     (make-frame-from-callobj (omNG-make-new-marker (om-make-point (om-point-h where) (- (h (assoc-view self)) 26))
-                                                                    (mk-unique-name (assoc-view self) "marker")   x)))))
+  (let* ((x (om-point-h (pixel2point (assoc-view self) where)))
+         (target (assoc-view self)))
+    (omg-add-element target
+                     (let ((*make-frame-zoom-context*
+                            (and (typep target 'om-scroller) (om-zoom-of target))))
+                       (make-frame-from-callobj (omNG-make-new-marker (om-make-point (om-point-h where) (- (h target) 26))
+                                                                      (mk-unique-name target "marker")   x))))))
 
 
 (defmethod strech-ruler-release ((view metric-ruler) pos)

@@ -148,23 +148,90 @@ This class inherites from om-view-d-d, so all scrollers allow  drag and drop, wh
 (defmethod om-remove-subviews ((self metaobj-panel) &rest subviews)
    (declare (ignore subviews))
    (call-next-method)
-   (set-field-size self))
+   (unless (om-api::locked self)
+     (set-field-size self)))
 
 (defmethod set-field-size ((self  t)) t)
 
+(defun set-field-size-bottom-logical (view zoom)
+  (when (and (boxframe-p view) (object view))
+    (let ((zoom (or zoom 1.0)))
+      (om-add-points
+       (or (frame-position (object view))
+           (if (= zoom 1.0)
+               (om-view-position view)
+             (om-zoom-unscale-point (om-view-position view) zoom)))
+       (or (frame-size (object view))
+           (if (= zoom 1.0)
+               (om-view-size view)
+             (om-zoom-unscale-point (om-view-size view) zoom)))))))
+
+#|
 (defmethod set-field-size ((self metaobj-panel))
-  (let ((max-h 200) (max-v 150) bottom);((max-h 50) (max-v 150) bottom) 
-    (mapcar 
+  (let ((max-h 200) (max-v 150) bottom);((max-h 50) (max-v 150) bottom)
+    (mapcar
      #'(lambda (view)
 	 (let ((bottom (om-add-points (om-view-position view) (om-view-size view))))
 	   (setf max-h (max max-h  (om-point-h bottom)))
 	   (setf max-v (max max-v  (om-point-v bottom)))))
      (om-subviews self))
     (setf bottom (om-make-point (+ max-h 15) (+ max-v 15)))
-    (ignore-errors 
+    (ignore-errors
       (when (not (om-points-equal-p bottom (om-field-size self)))
 	(om-set-field-size self bottom)))
     (om-point-v bottom)))
+|#
+
+(defmethod set-field-size ((self metaobj-panel))
+  (let* ((zoom (if (typep self 'om-scroller) (om-zoom-of self) 1.0))
+         (max-h 200) (max-v 150)
+         bottom-logical bottom-visual current target
+         viewport-w viewport-h slug-h slug-v)
+    (mapcar
+     #'(lambda (view)
+	 (let ((b (set-field-size-bottom-logical view zoom)))
+	   (when b
+	     (setf max-h (max max-h (om-point-h b)))
+	     (setf max-v (max max-v (om-point-v b))))))
+     (om-subviews self))
+    (setf bottom-logical (om-make-point (+ max-h 15) (+ max-v 15)))
+    (setf bottom-visual  (if (= zoom 1.0)
+                             bottom-logical
+                           (om-zoom-scale-point bottom-logical zoom)))
+    (setf current (om-field-size self))
+    (multiple-value-setq (viewport-w viewport-h)
+      (handler-case (capi:simple-pane-visible-size self)
+        (error (c)
+          (format *om-stream* "~&[set-field-size visible-size ERROR] ~A~%"
+                  (princ-to-string c))
+          (values 0 0))))
+    (setf viewport-w (or viewport-w 0)
+          viewport-h (or viewport-h 0))
+    (setf slug-h (or (handler-case (capi::get-horizontal-scroll-parameters self :slug-position)
+                       (error (c)
+                         (format *om-stream* "~&[set-field-size h-slug ERROR] ~A~%"
+                                 (princ-to-string c))
+                         0)) 0))
+    (setf slug-v (or (handler-case (capi::get-vertical-scroll-parameters self :slug-position)
+                       (error (c)
+                         (format *om-stream* "~&[set-field-size v-slug ERROR] ~A~%"
+                                 (princ-to-string c))
+                         0)) 0))
+    (let* ((desired-h (max (om-point-h bottom-visual) viewport-w))
+           (desired-v (max (om-point-v bottom-visual) viewport-h))
+           (safe-h (if (>= desired-h (+ slug-h viewport-w))
+                       desired-h
+                     (om-point-h current)))
+           (safe-v (if (>= desired-v (+ slug-v viewport-h))
+                       desired-v
+                     (om-point-v current))))
+      (setf target (om-make-point safe-h safe-v)))
+    (handler-case
+        (when (not (om-points-equal-p target current))
+          (om-set-field-size self target))
+      (error (c)
+        (format *om-stream* "~&[set-field-size ERROR] ~A~%" (princ-to-string c))))
+    (om-point-v target)))
           
 
 (defmethod handle-key-event ((self metaobj-panel) char) nil)

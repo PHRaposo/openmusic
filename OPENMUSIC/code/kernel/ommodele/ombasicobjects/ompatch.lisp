@@ -224,15 +224,23 @@ put this code in this method."
 (defmethod OpenEditorframe ((self OMPatch))
   "Open the patch editor, this method open too all persistantes objects referenced into the patch."
   (declare (special *om-current-persistent*))
-  (load-patch self)  
-  (loop for i in (send-receive-keys self) 
+  (load-patch self)
+  (loop for i in (send-receive-keys self)
         do (open-all-keys i))
   (or (editorframe self)
       (if (lisp-exp-p self)
           (edit-existing-lambda-expression self)
-        (panel (open-new-relationframe self (if (saved? self) (name self) 
-                                              (string+ "^" (name self))) (get-elements self)
-                                       )))))
+        (let ((panel (panel (open-new-relationframe self (if (saved? self) (name self)
+                                                          (string+ "^" (name self))) (get-elements self)))))
+          (let ((z (get-win-zoom self)))
+            (when (and panel z (typep panel 'om-scroller) (not (= z 1.0)))
+              (let ((was-changed (changed-wsparams? self)))
+                (setf (capi:capi-object-property panel :om-zoom-restoring-p) t)
+                (unwind-protect
+                    (om-zoom-update panel z)
+                  (setf (capi:capi-object-property panel :om-zoom-restoring-p) nil)
+                  (setf (changed-wsparams? self) was-changed)))))
+          panel))))
 
 
 
@@ -453,9 +461,10 @@ put this code in this method."
 ;PATCH ABSTRACTION (reference of red patches boxes
 ;==========================================
 
-(defclass OMPatchAbs (OMPatch) 
+(defclass OMPatchAbs (OMPatch)
   ((w-size :accessor w-size :initform (om-make-point 400 500))
-   (w-pos :accessor w-pos :initform (om-make-point 200 200)))
+   (w-pos :accessor w-pos :initform (om-make-point 200 200))
+   (w-zoom :accessor w-zoom :initform 1.0))
    (:documentation "This is the class of the patch references of red patch boxes.
 The difference with normal patches is that this patches are not saved in a owner file.
 These patches are saved in the patch file which contains the red boxes.
@@ -505,11 +514,16 @@ So abstractions or red patches can not be sharing.#enddoc#
      (push rep (attached-objs patch))
      rep))
 
-(defmethod set-win-size ((self OMPatchAbs) newsize) 
+(defmethod set-win-size ((self OMPatchAbs) newsize)
   (setf (w-size self) newsize))
 
-(defmethod set-win-position ((self OMPatchAbs) newpos) 
+(defmethod set-win-position ((self OMPatchAbs) newpos)
   (setf (w-pos self) newpos))
+
+(defmethod get-win-zoom ((self OMPatchAbs)) (w-zoom self))
+
+(defmethod set-win-zoom ((self OMPatchAbs) zoom)
+  (setf (w-zoom self) zoom))
 
 ;;; for send-receive
 #|
@@ -528,11 +542,17 @@ So abstractions or red patches can not be sharing.#enddoc#
    (or (editorframe self)
        (if (lisp-exp-p self)
          (edit-existing-lambda-expression self)
-         (panel (open-new-relationframe  self (if (saved? self) (name self) 
-                                                 (string+ "^" (name self))) (get-elements self)
-                                         nil
-                                         (w-pos self) (w-size self)
-                                         )))))
+         (let ((panel (panel (open-new-relationframe self (if (saved? self) (name self)
+                                                            (string+ "^" (name self))) (get-elements self)
+                                                     nil
+                                                     (w-pos self) (w-size self)))))
+           (let ((z (w-zoom self)))
+             (when (and panel z (typep panel 'om-scroller) (not (= z 1.0)))
+               (setf (capi:capi-object-property panel :om-zoom-restoring-p) t)
+               (unwind-protect
+                   (om-zoom-update panel z)
+                 (setf (capi:capi-object-property panel :om-zoom-restoring-p) nil))))
+           panel))))
 
 (defmethod OpenSrEditorframe ((self OMPatchAbs))
   "Special method: open the patch editor, where omsend is found."
@@ -579,17 +599,21 @@ So abstractions or red patches can not be sharing.#enddoc#
             (doc (str-without-nl (doc self)))
             pictlist)
         (setf pictlist (omng-save (pictu-list self)))
-        (when (editorframe self) 
+        (when (editorframe self)
           (set-win-size self (om-interior-size (window (editorframe self))))
-          (set-win-position self (om-view-position (window (editorframe self)))))
-        `(om-load-patch-abs1 ,(name self) ',boxes ',connectiones ,*om-version* ,pictlist ,doc 
-                             ,(om-save-point (w-pos self)) ,(om-save-point (w-size self))))))
+          (set-win-position self (om-view-position (window (editorframe self))))
+          (let ((p (panel (editorframe self))))
+            (when (and p (typep p 'om-scroller))
+              (set-win-zoom self (om-zoom-of p)))))
+        `(om-load-patch-abs1 ,(name self) ',boxes ',connectiones ,*om-version* ,pictlist ,doc
+                             ,(om-save-point (w-pos self)) ,(om-save-point (w-size self))
+                             ,(w-zoom self)))))
 
-(defun om-load-patch-abs1 (name boxes connections 
-                                &optional (version nil) (pictlist nil) (doc "") wpos wsize
+(defun om-load-patch-abs1 (name boxes connections
+                                &optional (version nil) (pictlist nil) (doc "") wpos wsize wzoom
                                 &rest args)
    "This function is called when you load a saved Abstraction patch."
-   (let ((newpatch (make-instance 'OMPatchAbs :name name :icon 210))) 
+   (let ((newpatch (make-instance 'OMPatchAbs :name name :icon 210)))
      (setf (boxes newpatch) nil)
      (mapc #'(lambda (box) (omNG-add-element newpatch (eval box))) boxes)
      (setf (boxes newpatch) (reverse (boxes newpatch)))
@@ -599,6 +623,7 @@ So abstractions or red patches can not be sharing.#enddoc#
      (setf (doc newpatch) (str-with-nl doc))
      (when wpos (setf (w-pos newpatch) wpos))
      (when wsize (setf (w-size newpatch) wsize))
+     (when (and wzoom (numberp wzoom)) (setf (w-zoom newpatch) wzoom))
      (compile-patch newpatch)
      (when version
        (setf (omversion newpatch) version))

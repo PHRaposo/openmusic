@@ -204,10 +204,15 @@
 ;-----------------Patch target------------
 
 (defmethod make-func-from-obj ((self patchPanel) obj pos &optional name)
-  (let ((theobj (object obj)))
-    (omG-add-element self (make-frame-from-callobj 
-                           (omNG-make-new-boxcall theobj  pos 
-                                                  (or name (mk-unique-name self (name theobj))))))))
+  (let* ((zoom    (om-zoom-of self))
+         (log-pos (if (= zoom 1.0) pos (om-zoom-unscale-point pos zoom)))
+         (theobj  (object obj)))
+    (omG-add-element self
+                     (let ((*make-frame-zoom-context*
+                            (and (typep self 'om-scroller) (om-zoom-of self))))
+                       (make-frame-from-callobj
+                        (omNG-make-new-boxcall theobj  log-pos
+                                               (or name (mk-unique-name self (name theobj)))))))))
 
 (defmethod perform-drop ((D&DHandler omdrag-drop) (dragged patch-icon-frame) 
                          (target patchPanel) position)
@@ -232,12 +237,17 @@
                          (target patchPanel) position)
   (make-func-from-obj target dragged (om-mouse-position target)) t)
 
-(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged lispfun-icon-frame) 
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged lispfun-icon-frame)
                          (target patchPanel) position)
-  (let ((theobj (object dragged)))
-    (omG-add-element target (make-frame-from-callobj 
-                           (omNG-make-new-lispboxcall (funname theobj)  position 
-                                                  (mk-unique-name target (name theobj)))))) t)
+  (let* ((zoom    (om-zoom-of target))
+         (log-pos (if (= zoom 1.0) position (om-zoom-unscale-point position zoom)))
+         (theobj (object dragged)))
+    (omG-add-element target
+                     (let ((*make-frame-zoom-context*
+                            (and (typep target 'om-scroller) (om-zoom-of target))))
+                       (make-frame-from-callobj
+                        (omNG-make-new-lispboxcall (funname theobj)  log-pos
+                                                   (mk-unique-name target (name theobj))))))) t)
 
 
 (defmethod perform-drop ((D&DHandler omdrag-drop) (dragged type-icon-frame) 
@@ -248,81 +258,118 @@
                          (target patchPanel) position)
   (make-func-from-obj target dragged position (name (object dragged))) t)
 
-(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged class-icon-frame) 
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged class-icon-frame)
                            (target patchPanel) position)
-   (let* ((theobj (object dragged))
+   (declare (ignore position))
+   (let* ((zoom    (om-zoom-of target))
+          (vis-pos (om-mouse-position target))
+          (log-pos (if (= zoom 1.0) vis-pos (om-zoom-unscale-point vis-pos zoom)))
+          (theobj (object dragged))
           (new-name (name theobj)) newobj)
      (if (om-shift-key-p)
-         (setf newobj (omNG-make-new-boxcall-slots theobj  (om-mouse-position target) (mk-unique-name target new-name)))
-       (setf newobj (omNG-make-new-boxcall theobj  (om-mouse-position target) (mk-unique-name target new-name))))
-     (omG-add-element target (make-frame-from-callobj newobj))
+         (setf newobj (omNG-make-new-boxcall-slots theobj  log-pos (mk-unique-name target new-name)))
+       (setf newobj (omNG-make-new-boxcall theobj  log-pos (mk-unique-name target new-name))))
+     (omG-add-element target
+                      (let ((*make-frame-zoom-context*
+                             (and (typep target 'om-scroller) (om-zoom-of target))))
+                        (make-frame-from-callobj newobj)))
      t))
 
-(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged classboxframe) 
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged classboxframe)
                            (target patchPanel) position)
-   (let* ((theobj (find-class (reference (object dragged))))
+   (let* ((zoom    (om-zoom-of target))
+          (log-pos (if (= zoom 1.0) position (om-zoom-unscale-point position zoom)))
+          (theobj (find-class (reference (object dragged))))
           (new-name (name theobj)) newobj)
      (if (om-shift-key-p)
-       (setf newobj (omNG-make-new-boxcall-slots theobj  position (mk-unique-name target new-name)))
-       (setf newobj (omNG-make-new-boxcall theobj  position (mk-unique-name target new-name))))
-     (omG-add-element target (make-frame-from-callobj newobj))
+       (setf newobj (omNG-make-new-boxcall-slots theobj  log-pos (mk-unique-name target new-name)))
+       (setf newobj (omNG-make-new-boxcall theobj  log-pos (mk-unique-name target new-name))))
+     (omG-add-element target
+                      (let ((*make-frame-zoom-context*
+                             (and (typep target 'om-scroller) (om-zoom-of target))))
+                        (make-frame-from-callobj newobj)))
      t))
 
-(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged slot-icon-frame) 
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged slot-icon-frame)
                            (target patchPanel) position)
-   (let* ((typeslot (string (thetype (object dragged))))
-          (basic? (find-if #'(lambda (x) 
+   (let* ((zoom    (om-zoom-of target))
+          (log-pos (if (= zoom 1.0) position (om-zoom-unscale-point position zoom)))
+          (typeslot (string (thetype (object dragged))))
+          (basic? (find-if #'(lambda (x)
                                (string-equal (class-name x) typeslot)) *Basic-Lisp-Types*)))
      (unless basic?
        (setf basic? (find-class (thetype (object dragged)))))   ;aaa*
-     (omG-add-element target (make-frame-from-callobj 
-                              (omNG-make-new-boxcall basic? position 
-                                                     (mk-unique-name target (name basic?)))))
+     (omG-add-element target
+                      (let ((*make-frame-zoom-context*
+                             (and (typep target 'om-scroller) (om-zoom-of target))))
+                        (make-frame-from-callobj
+                         (omNG-make-new-boxcall basic? log-pos
+                                                (mk-unique-name target (name basic?))))))
      t))
 
-(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged omboxframe) 
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged omboxframe)
                            (target patchPanel) position)
-   (omg-remove-element (om-view-container dragged) dragged)
-   (let ((new (make-frame-from-callobj (object dragged))))
-     (omG-add-element target new)
-     (setf (frames (object new)) (list new))
-     (om-set-view-position new position)
-     (setf (frame-position (object new)) (borne-position position))
-     t))
+  (let* ((zoom    (om-zoom-of target))
+         (log-pos (if (= zoom 1.0) position (om-zoom-unscale-point position zoom))))
+    (omg-remove-element (om-view-container dragged) dragged)
+    (let ((new (let ((*make-frame-zoom-context*
+                      (and (typep target 'om-scroller) (om-zoom-of target))))
+                 (make-frame-from-callobj (object dragged)))))
+      (omG-add-element target new)
+      (setf (frames (object new)) (list new))
+      (let ((*om-zoom-drag-visual-pos* position))
+        (om-set-view-position new log-pos))
+      (setf (frame-position (object new)) (borne-position log-pos))
+      t)))
 
 
-(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged icon-method) 
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged icon-method)
                          (target patchPanel) position)
-  (omG-add-element target (make-frame-from-callobj 
-                           (omNG-make-new-boxcall (fdefinition (method-name (object dragged)))  position  ;aaa* 
-                                                  (mk-unique-name target (name dragged))))) t)
+  (let* ((zoom    (om-zoom-of target))
+         (log-pos (if (= zoom 1.0) position (om-zoom-unscale-point position zoom))))
+    (omG-add-element target
+                     (let ((*make-frame-zoom-context*
+                            (and (typep target 'om-scroller) (om-zoom-of target))))
+                       (make-frame-from-callobj
+                        (omNG-make-new-boxcall (fdefinition (method-name (object dragged)))  log-pos  ;aaa*
+                                               (mk-unique-name target (name dragged))))))) t)
 
 
-(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged tempobjframe) 
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged tempobjframe)
                          (target patchPanel) position)
 
-  (let ((new-position position)) 
+  (let* ((zoom         (om-zoom-of target))
+         (new-position (if (= zoom 1.0) position (om-zoom-unscale-point position zoom))))
     ;;; would be nice to do something here to compensate the size difference between possibly-long temporal boxes and fixed-with patch boxes...
 
     ;;; from maquette to patch, it is better to just create the box where the mouse is...
     (cond
      ((or (om-maquette-abs-p (reference (object dragged))) (abspatch-p (reference (object dragged))))
-      (omG-add-element target (make-frame-from-callobj 
-                               (omNG-make-new-boxcall (clone (reference (object dragged)))
-                                                    new-position (mk-unique-name target (name (reference (object dragged)))))))
+      (omG-add-element target
+                       (let ((*make-frame-zoom-context*
+                              (and (typep target 'om-scroller) (om-zoom-of target))))
+                         (make-frame-from-callobj
+                          (omNG-make-new-boxcall (clone (reference (object dragged)))
+                                               new-position (mk-unique-name target (name (reference (object dragged))))))))
       t)
      ((patch-p (reference (object dragged)))
-      (omG-add-element target (make-frame-from-callobj 
-                               (omNG-make-new-boxcall (reference (object dragged)) 
-                                                      new-position (mk-unique-name target (name (reference (object dragged))))))) 
+      (omG-add-element target
+                       (let ((*make-frame-zoom-context*
+                              (and (typep target 'om-scroller) (om-zoom-of target))))
+                         (make-frame-from-callobj
+                          (omNG-make-new-boxcall (reference (object dragged))
+                                                 new-position (mk-unique-name target (name (reference (object dragged))))))))
     t)
      ((ominstance-p (reference (object dragged)))
-    
-      (let ((newbox (omNG-make-new-boxcall (omNG-make-new-instance (clone (car (value (object dragged)))) 
+
+      (let ((newbox (omNG-make-new-boxcall (omNG-make-new-instance (clone (car (value (object dragged))))
                                                                    (mk-unique-name target (name dragged)))
                                            new-position (mk-unique-name target (name dragged)))))
         (setf (edition-params (reference newbox)) (eval (copy-edition-params (object dragged))))
-        (omG-add-element target (make-frame-from-callobj newbox))
+        (omG-add-element target
+                         (let ((*make-frame-zoom-context*
+                                (and (typep target 'om-scroller) (om-zoom-of target))))
+                           (make-frame-from-callobj newbox)))
         t))
    (t nil))))
 
@@ -421,26 +468,30 @@
 
 
 ;-------------------Class-tree target-----------------------
-(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged classboxFrame) 
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged classboxFrame)
                          (target classTreePanel) position)
   (if (protected-p (find-class (reference (object dragged))))
     (om-beep-msg "This class is protected, try with an alias")
-    (progn
+    (let* ((zoom    (om-zoom-of target))
+           (log-pos (if (= zoom 1.0) position (om-zoom-unscale-point position zoom))))
       (omg-remove-element  (om-view-container  dragged) dragged)
       (omG-add-element  target dragged)
-      (om-set-view-position dragged position)
-      (setf (frame-position (object dragged)) (borne-position position))
+      (let ((*om-zoom-drag-visual-pos* position))
+        (om-set-view-position dragged log-pos))
+      (setf (frame-position (object dragged)) (borne-position log-pos))
       t)))
 
-(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged aliasBoxframe) 
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged aliasBoxframe)
                          (target classTreePanel) position)
   (if (and (OMBoxClass? (reference (object dragged)))
            (not (protected-p (object dragged))))
-    (progn
+    (let* ((zoom    (om-zoom-of target))
+           (log-pos (if (= zoom 1.0) position (om-zoom-unscale-point position zoom))))
       (omg-remove-element  (om-view-container  dragged) dragged)
       (omG-add-element  target dragged)
-      (om-set-view-position dragged position)
-      (setf (frame-position (object dragged)) (borne-position position))
+      (let ((*om-zoom-drag-visual-pos* position))
+        (om-set-view-position dragged log-pos))
+      (setf (frame-position (object dragged)) (borne-position log-pos))
       t)))
 
 
@@ -488,40 +539,47 @@
 
 ;----------------Maquette target---
 
-(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged patch-icon-frame) 
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged patch-icon-frame)
                          (target MaquettePanel) position)
   (let* ((maqpos (get-offset/posy-from-pixel target position))
-         (new-call (omNG-make-tempobj (object dragged) maqpos 
+         (new-call (omNG-make-tempobj (object dragged) maqpos
                                       (name (object dragged))
                                       ;(mk-unique-name target "tempobj")
                                       ))
          new-frame)
-    (setf new-frame (make-frame-from-callobj new-call))
+    (setf new-frame (let ((*make-frame-zoom-context*
+                           (and (typep target 'om-scroller) (om-zoom-of target))))
+                      (make-frame-from-callobj new-call)))
     (omG-add-element target new-frame)) t)
 
-(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged maquette-icon-frame) 
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged maquette-icon-frame)
                          (target MaquettePanel) position)
   (let* ((maqpos (get-offset/posy-from-pixel target position))
-        (new-call (omNG-make-tempobj (object dragged) maqpos 
+        (new-call (omNG-make-tempobj (object dragged) maqpos
                                      ;;;(mk-unique-name target "maquette")
                                      (name (object dragged))
                                      ))
         new-frame)
-   (setf new-frame (make-frame-from-callobj new-call))
+   (setf new-frame (let ((*make-frame-zoom-context*
+                          (and (typep target 'om-scroller) (om-zoom-of target))))
+                     (make-frame-from-callobj new-call)))
     (omG-add-element target new-frame)) t)
 
-(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged omboxframe) 
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged omboxframe)
                          (target MaquettePanel) position)
   (if (allowed-in-maq-p (value (object dragged)))
     (let* ((omins (omNG-make-new-instance (clone (value (object dragged))) (name (object dragged))))
            (maqpos (get-offset/posy-from-pixel target position))
            (new-call (omNG-make-tempobj omins maqpos (name (object dragged)))))
       (setf (edition-params new-call) (eval (copy-value-params (value (object dragged)) (object dragged))))
-      (omG-add-element target (make-frame-from-callobj new-call))
+      (omG-add-element target
+                       (let ((*make-frame-zoom-context*
+                              (and (typep target 'om-scroller) (om-zoom-of target))))
+                         (make-frame-from-callobj new-call)))
       t)
     (om-beep-msg "I can not put this into the maquette")))
 
-(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged instboxframe) 
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged instboxframe)
                          (target MaquettePanel) position)
   ;for score instances
   (when (allowed-in-maq-p (car (value (object dragged))))
@@ -529,7 +587,10 @@
            (maqpos (get-offset/posy-from-pixel target position))
            (new-call (omNG-make-tempobj omins maqpos (name (object dragged)))))
       (setf (edition-params new-call) (eval (copy-value-params (car (value (object dragged))) (object dragged))))
-      (omG-add-element target (make-frame-from-callobj new-call))
+      (omG-add-element target
+                       (let ((*make-frame-zoom-context*
+                              (and (typep target 'om-scroller) (om-zoom-of target))))
+                         (make-frame-from-callobj new-call)))
       t))
   ;;;
   (if (allowed-in-maq-p (value (object dragged)))
@@ -538,23 +599,28 @@
       (if (global-p (reference (object dragged)))
           (setf new-call (omNG-make-tempobj (reference (object dragged)) maqpos (name (object dragged))))
         (setf new-call (omNG-make-tempobj (omNG-make-new-instance (clone (value (object dragged)))
-                                                                  (name (object dragged))) 
+                                                                  (name (object dragged)))
                                           maqpos (name (object dragged)))))
-      
+
       (setf (edition-params new-call) (eval (copy-value-params (value (object dragged)) (object dragged))))
-      (omG-add-element target (make-frame-from-callobj new-call))
+      (omG-add-element target
+                       (let ((*make-frame-zoom-context*
+                              (and (typep target 'om-scroller) (om-zoom-of target))))
+                         (make-frame-from-callobj new-call)))
       t)
     (unless (allowed-in-maq-p (car (value (object dragged))))
     (om-beep-msg "I can not put this into the maquette"))))
 
 
-(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged class-icon-frame) 
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged class-icon-frame)
                          (target MaquettePanel) position)
   (let* ((maqpos (get-offset/posy-from-pixel target position))
          (new-call (omNG-make-tempobj (object dragged) maqpos (mk-unique-name target "tempobj")))
          new-frame)
     (when new-call
-      (setf new-frame (make-frame-from-callobj new-call))
+      (setf new-frame (let ((*make-frame-zoom-context*
+                             (and (typep target 'om-scroller) (om-zoom-of target))))
+                        (make-frame-from-callobj new-call)))
       (omG-add-element target new-frame) t)))
 
 ;(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged slot-icon-frame) 
@@ -565,52 +631,66 @@
 ;    (when new-call
 ;      (omG-add-element target new-frame) t)))
 
-(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged instance-icon-frame) 
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged instance-icon-frame)
                          (target MaquettePanel) position)
   (let* ((maqpos (get-offset/posy-from-pixel target position))
          (new-call (omNG-make-tempobj (object dragged) maqpos (name (object dragged))))
          new-frame)
     (when new-call
-      (setf new-frame (make-frame-from-callobj new-call))
+      (setf new-frame (let ((*make-frame-zoom-context*
+                             (and (typep target 'om-scroller) (om-zoom-of target))))
+                        (make-frame-from-callobj new-call)))
       (omG-add-element target new-frame) t)))
 
 ;;; ****
-(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged patchboxframe) 
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged patchboxframe)
                          (target MaquettePanel) position)
   (let* ((maqpos (get-offset/posy-from-pixel target position))
-         (new-call (omNG-make-tempobj (reference (object dragged)) maqpos 
+         (new-call (omNG-make-tempobj (reference (object dragged)) maqpos
                                       (name (reference (object dragged)))
                                       ;(mk-unique-name target "tempobj")
                                       )))
-    (omG-add-element target (make-frame-from-callobj new-call))
+    (omG-add-element target
+                     (let ((*make-frame-zoom-context*
+                            (and (typep target 'om-scroller) (om-zoom-of target))))
+                       (make-frame-from-callobj new-call)))
     t))
 
-(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged maquetteframe) 
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged maquetteframe)
                          (target MaquettePanel) position)
   (let* ((maqpos (get-offset/posy-from-pixel target position))
-         (new-call (omNG-make-tempobj (reference (object dragged)) maqpos 
+         (new-call (omNG-make-tempobj (reference (object dragged)) maqpos
                                       (name (reference (object dragged)))
                                       ;(mk-unique-name target "maquette")
                                       )))
-    (omG-add-element target (make-frame-from-callobj new-call))
+    (omG-add-element target
+                     (let ((*make-frame-zoom-context*
+                            (and (typep target 'om-scroller) (om-zoom-of target))))
+                       (make-frame-from-callobj new-call)))
     t))
 
-(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged patchboxabsframe) 
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged patchboxabsframe)
                          (target MaquettePanel) position)
   (let* ((maqpos (get-offset/posy-from-pixel target position))
-         (new-call (omNG-make-tempobj (eval (omng-copy (reference (object dragged)))) maqpos 
+         (new-call (omNG-make-tempobj (eval (omng-copy (reference (object dragged)))) maqpos
                                       (name (reference (object dragged))) ; (mk-unique-name target "tempobj")
                                       )))
-    (omG-add-element target (make-frame-from-callobj new-call))
+    (omG-add-element target
+                     (let ((*make-frame-zoom-context*
+                            (and (typep target 'om-scroller) (om-zoom-of target))))
+                       (make-frame-from-callobj new-call)))
     t))
 
-(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged maquetteabsframe) 
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged maquetteabsframe)
                          (target MaquettePanel) position)
   (let* ((maqpos (get-offset/posy-from-pixel target position))
-         (new-call (omNG-make-tempobj (eval (omng-copy (reference (object dragged)))) maqpos 
+         (new-call (omNG-make-tempobj (eval (omng-copy (reference (object dragged)))) maqpos
                                       (name (reference (object dragged))) ; (mk-unique-name target "abs-maquette")
                                       )))
-    (omG-add-element target (make-frame-from-callobj new-call))
+    (omG-add-element target
+                     (let ((*make-frame-zoom-context*
+                            (and (typep target 'om-scroller) (om-zoom-of target))))
+                       (make-frame-from-callobj new-call)))
     t))
 
 
@@ -762,58 +842,106 @@
   (declare (ignore position))
   (make-typed-input-from-obj (find-class (reference (object dragged)) nil) (om-view-container target)))
 
+;; methodEditor-input-button is a typed-input-button variant carrying an
+;; explicit TARGET-PANEL: the button lives in the methodEditor zoom bar,
+;; so (om-view-container target) returns the bar instead of the panel.
+
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged class-icon-frame)
+                         (target methodEditor-input-button) position)
+  (declare (ignore position))
+  (funcall (action target) dragged))
+
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged type-icon-frame)
+                         (target methodEditor-input-button) position)
+  (declare (ignore position))
+  (funcall (action target) dragged))
+
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged instBoxframe)
+                         (target methodEditor-input-button) position)
+  (declare (ignore position))
+  (make-typed-input-from-obj (class-of (value (object dragged)))
+                             (target-panel target)
+                             (value (object dragged))))
+
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged boxEditorFrame)
+                         (target methodEditor-input-button) position)
+  (declare (ignore position))
+  (make-typed-input-from-obj (class-of (value (object dragged)))
+                             (target-panel target)
+                             (value (object dragged))))
+
+(defmethod perform-drop ((D&DHandler omdrag-drop) (dragged classBoxframe)
+                         (target methodEditor-input-button) position)
+  (declare (ignore position))
+  (make-typed-input-from-obj (find-class (reference (object dragged)) nil)
+                             (target-panel target)))
+
 ;=====================================================
 ;Perform copies with OPT-KEY
 ;=====================================================
 
 
 (defmethod perform-duplicate-list ((D&DHandler omdrag-drop) (targetobj OMPatch) (target-frame t) subframes copies pos0)
+  (declare (ignore pos0))
   (unless (subtypep (type-of (container-view D&DHandler)) 'maquettepanel)
-       (let (boxes rep)
-     (copy-connections subframes copies)
-     (loop for item in (get-actives target-frame) do
-               (omG-unselect item))
-     
-     (om-with-delayed-update target-frame
-       (mapcar #'(lambda (object)
-                   (setf (frame-position object) 
-                         (borne-position (om-add-points
-                                          (frame-position object)
-                                          (om-subtract-points (drop-mouse-pos D&DHandler) (initial-mouse-pos D&DHandler))
-                                          )
-                                         ))
-                   (let ((new-frame (make-frame-from-callobj object)))
-                     (push new-frame rep)
-                   (omG-add-element target-frame new-frame)
-                   (omG-select new-frame))) copies)
-       (setf boxes (get-elements targetobj))
-       (mapc #'(lambda (box)
-                 (update-graphic-connections box boxes)) rep)
-       )
-     
-     (om-invalidate-view target-frame)
-     t)
-   ))
+    (let* ((zoom      (om-zoom-of target-frame))
+           (delta-vis (om-subtract-points (drop-mouse-pos D&DHandler) (initial-mouse-pos D&DHandler)))
+           boxes rep)
+      (copy-connections subframes copies)
+      (loop for item in (get-actives target-frame) do
+            (omG-unselect item))
+
+      (om-with-delayed-update target-frame
+        (mapcar #'(lambda (object)
+                    (let* ((old-logical (frame-position object))
+                           (old-visual  (if (= zoom 1.0) old-logical (om-zoom-scale-point old-logical zoom)))
+                           (new-visual  (om-add-points old-visual delta-vis))
+                           (new-logical (if (= zoom 1.0) new-visual (om-zoom-unscale-point new-visual zoom))))
+                      (setf (frame-position object) (borne-position new-logical))
+                      (let ((new-frame (let ((*make-frame-zoom-context*
+                                              (and (typep target-frame 'om-scroller) (om-zoom-of target-frame))))
+                                         (make-frame-from-callobj object))))
+                        (push new-frame rep)
+                        (omG-add-element target-frame new-frame)
+                        (let ((*om-zoom-drag-visual-pos* new-visual))
+                          (om-set-view-position new-frame new-logical))
+                        (omG-select new-frame))))
+                copies)
+        (setf boxes (get-elements targetobj))
+        (mapc #'(lambda (box)
+                  (update-graphic-connections box boxes)) rep))
+
+      (om-invalidate-view target-frame)
+      t)))
 
 
 (defmethod perform-duplicate-list ((D&DHandler omdrag-drop) (targetobj OMMethod) (target-frame t) subframes copies pos0)
-   (let (boxes rep)
-     (copy-connections subframes copies)
-     (loop for item in (get-actives target-frame) do
-           (omG-unselect item))
-     (mapcar #'(lambda (object)
-                 (setf (frame-position object) 
-                       (borne-position  (om-add-points
-                                          (frame-position object)
-                                          (om-subtract-points (drop-mouse-pos D&DHandler) (initial-mouse-pos D&DHandler))
-                                          )))
-                 (let ((new-frame (make-frame-from-callobj object)))
-                   (push new-frame rep)
-                   (omG-add-element target-frame new-frame)
-                   (omG-select new-frame))) copies)
-     (setf boxes (get-elements targetobj))
-     (mapc #'(lambda (box)
-               (update-graphic-connections box boxes)) rep)) t)
+  (declare (ignore pos0))
+  (let* ((zoom      (om-zoom-of target-frame))
+         (delta-vis (om-subtract-points (drop-mouse-pos D&DHandler) (initial-mouse-pos D&DHandler)))
+         boxes rep)
+    (copy-connections subframes copies)
+    (loop for item in (get-actives target-frame) do
+          (omG-unselect item))
+    (mapcar #'(lambda (object)
+                (let* ((old-logical (frame-position object))
+                       (old-visual  (if (= zoom 1.0) old-logical (om-zoom-scale-point old-logical zoom)))
+                       (new-visual  (om-add-points old-visual delta-vis))
+                       (new-logical (if (= zoom 1.0) new-visual (om-zoom-unscale-point new-visual zoom))))
+                  (setf (frame-position object) (borne-position new-logical))
+                  (let ((new-frame (let ((*make-frame-zoom-context*
+                                          (and (typep target-frame 'om-scroller) (om-zoom-of target-frame))))
+                                     (make-frame-from-callobj object))))
+                    (push new-frame rep)
+                    (omG-add-element target-frame new-frame)
+                    (let ((*om-zoom-drag-visual-pos* new-visual))
+                      (om-set-view-position new-frame new-logical))
+                    (omG-select new-frame))))
+            copies)
+    (setf boxes (get-elements targetobj))
+    (mapc #'(lambda (box)
+              (update-graphic-connections box boxes)) rep)
+    t))
 
 
 (defmethod perform-duplicate-list ((D&DHandler omdrag-drop) (targetobj OMMaquette) (target-frame t) subframes copies pos0)
@@ -848,7 +976,9 @@
                       (setf (slot-value object 'posy)  (om-point-v symbolic-new-pos))
                       (setf (offset object) (om-point-h symbolic-new-pos))
                 
-                      (let ((new-frame (make-frame-from-callobj object)))
+                      (let ((new-frame (let ((*make-frame-zoom-context*
+                                              (and (typep target-frame 'om-scroller) (om-zoom-of target-frame))))
+                                         (make-frame-from-callobj object))))
                         (push new-frame rep)
                         (omG-add-element target-frame new-frame)
                         (omG-select new-frame)))

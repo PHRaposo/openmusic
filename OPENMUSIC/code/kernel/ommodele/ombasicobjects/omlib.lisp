@@ -443,13 +443,33 @@ One OMlib is a collection of classes and generic functions loaded dinamiclly.#en
   *user-libs*))
 
 
+#|
 (defmethod AddPackage2Pack ((new-Package OMLib) inPackage &key (protect t))
   (let ((subpackages (subpackages inPackage)))
-    (if (find new-Package subpackages 
-              :test #'(lambda (lib1 lib2) 
+    (if (find new-Package subpackages
+              :test #'(lambda (lib1 lib2)
                         (and (string-equal (name lib1) (name lib2))
                              (cond ((and (version lib1) (version lib2))
                                     (= (version lib1) (version lib2)))
+                                   ((or (version lib1) (version lib2)) t)
+                                   (t nil)))))
+        (om-beep-msg (format nil "Library ~A~A already exists!!" (name new-Package)
+                             (if (version new-Package) (format nil " (~D)" (version new-Package)) "")))
+      (progn
+        (when protect (omNG-protect-object new-package))
+        (omNG-add-element inPackage new-package)
+        new-package))))
+|#
+
+(defmethod AddPackage2Pack ((new-Package OMLib) inPackage &key (protect t))
+  (let ((subpackages (subpackages inPackage)))
+    (if (find new-Package subpackages
+              :test #'(lambda (lib1 lib2)
+                        (and (string-equal (name lib1) (name lib2))
+                             (cond ((and (version lib1) (version lib2))
+                                    (if (and (numberp (version lib1)) (numberp (version lib2)))
+                                        (= (version lib1) (version lib2))
+                                      (equal (version lib1) (version lib2))))
                                    ((or (version lib1) (version lib2)) t)
                                    (t nil)))))
         (om-beep-msg (format nil "Library ~A~A already exists!!" (name new-Package)

@@ -30,8 +30,43 @@
 (in-package :om)
 
 (defvar *spec-new-boxes-types* nil)
+
+;;; Materialization helpers shared by the exit-from-dialog primaries.
+;;; Detect text containing unreadable Lisp syntax (e.g. (#<voice ...>))
+;;; so the dialog can preserve the underlying live value instead of
+;;; aborting with simple-reader-error.
+
+(defun om-str-parseable-as-lisp-p (str)
+  "T iff STR can be wholly consumed by READ without a reader-error.
+   The reader-error condition is logged with the offending text so the
+   dialog's caller can trace exactly why the input was rejected."
+  (handler-case
+      (with-input-from-string (in str)
+        (let ((eof (cons nil nil)))
+          (loop for form = (read in nil eof)
+                until (eq form eof)
+                finally (return t))))
+    (reader-error (c)
+      (format *om-stream*
+              "~&[om-str-parseable-as-lisp-p REJECTED] ~A~%   condition-type=~S~%   input=~S~%"
+              (princ-to-string c) (type-of c) str)
+      (finish-output *om-stream*)
+      nil)))
+
+(defun om-dismiss-ttybox-view (self)
+  "Detach the dialog SELF from its editor's text-view slot."
+  (when (om-view-container self)
+    (let ((editor (editor (om-view-container self))))
+      (when editor
+        (setf (text-view editor) nil)
+        (om-remove-subviews (panel editor) self)))))
+
+(defun om-warn-unreadable-materialize ()
+  (om-beep-msg
+   "Cannot materialize: text contains an unreadable object reference (#<...>). Value preserved."))
+
 ;==============
-;   TTYBOX 
+;   TTYBOX
 ;==============
 ;used to show and edit values i. e. inputs default values, etc.
 
@@ -213,15 +248,17 @@
                       (initial-text-ttybox self)
                     (remove #\Newline (initial-text-ttybox self))))
 	 (panel (om-view-container (om-view-container self)))
-	 (container (editor panel)))
+	 (container (editor panel))
+         (zoom (if (typep panel 'om-scroller) (om-zoom-of panel) 1.0))
+         (font (if (= zoom 1.0) *om-default-font1* (om-zoom-scale-font *om-default-font1* zoom))))
     (when (text-view container)
       (om-remove-subviews panel (text-view container))
       (setf (text-view container) nil))
     (setf (text-view container)
           (om-make-dialog-item (open-ttybox-class self)
-			       (om-add-points (om-subtract-points 
+			       (om-add-points (om-subtract-points
 					       (om-view-position self)
-					       #-win32 (om-make-point 2 2) #+win32 (om-make-point 0 0)) 
+					       #-win32 (om-make-point 2 2) #+win32 (om-make-point 0 0))
 					      (om-view-position (om-view-container self)))
 			       (om-view-size self)
 			       thetext
@@ -229,7 +266,7 @@
 			       :focus t
 			       :object self
 			       :container panel
-			       :font *om-default-font1*
+			       :font font
                                :in-place-completion-function #'(lambda (item str)
                                                                  (declare (ignore item))
                                                                  (or (funcall 'box-name-completion str)
@@ -250,9 +287,10 @@
   (exit-from-dialog self (om-dialog-item-text self)))
      
 
+#|
 ;;;remove text-view from panel
 (defmethod exit-from-dialog ((self change-text-enter-view) newtext)
-  (handler-bind ((error #'(lambda (c) (declare (ignore c)) 
+  (handler-bind ((error #'(lambda (c) (declare (ignore c))
 				  (when (om-view-container self)
 				    (setf (text-view (editor (om-view-container self))) nil)
 				    (om-remove-subviews (panel (editor (om-view-container self))) self))
@@ -269,6 +307,33 @@
       (reinit-size (om-view-container (object self)))
       (setf (text-view (editor (om-view-container self))) nil)
       (om-remove-subviews (panel (editor (om-view-container self))) self))))
+|#
+
+;;;remove text-view from panel
+(defmethod exit-from-dialog ((self change-text-enter-view) newtext)
+  (cond
+   ((not (om-str-parseable-as-lisp-p newtext))
+    (om-dismiss-ttybox-view self)
+    (om-warn-unreadable-materialize)
+    (om-abort))
+   (t
+    (handler-bind ((error #'(lambda (c)
+                              (format *om-stream*
+                                      "~&[exit-from-dialog change-text ERROR] ~A~%   condition-type=~S~%"
+                                      (princ-to-string c) (type-of c))
+                              (finish-output *om-stream*)
+                              (om-dismiss-ttybox-view self)
+                              (om-beep)
+                              (om-abort))))
+      (let ((*package* (find-package :om))
+            (newval (read-from-string newtext))
+            (box (object (om-view-container (object self)))))
+        (om-set-dialog-item-text (object self) newtext)
+        (setf (value box) newval)
+        (setf (thestring box) newtext)
+        (reinit-size (om-view-container (object self)))
+        (setf (text-view (editor (om-view-container self))) nil)
+        (om-remove-subviews (panel (editor (om-view-container self))) self))))))
 
 ;----------D&D
 (defmethod get-drag-object ((self ttybox)) (om-view-container self))
@@ -356,8 +421,9 @@
   (setf *tty-window* nil)
   (call-next-method)))
 
+#|
 (defmethod exit-from-dialog ((self apply-text-enter-view) str)
-  (handler-bind ((error #'(lambda (err) 
+  (handler-bind ((error #'(lambda (err)
                             (when (om-view-container (object self))
 			      (setf (text-view (editor (om-view-container (object self)))) nil)
 			      (om-remove-subviews (object self) self))
@@ -369,7 +435,32 @@
            (pos (om-view-position box))
            (scroller (om-view-container box))
            (theeditor (editor (om-view-container box))))
-      (unwind-protect 
+      (unwind-protect
+          (add-box-in-patch-panel str scroller pos)
+        (omG-remove-element scroller box)
+        (setf (text-view theeditor) nil)
+        (om-remove-subviews (panel theeditor) self)
+        (om-close-window *tty-window*)
+        (setf *tty-window* nil)
+        (om-invalidate-view (panel theeditor))))))
+|#
+
+(defmethod exit-from-dialog ((self apply-text-enter-view) str)
+  (handler-bind ((error #'(lambda (err)
+                            (when (om-view-container (object self))
+			      (setf (text-view (editor (om-view-container (object self)))) nil)
+			      (om-remove-subviews (object self) self))
+                            (om-beep)
+                            (print (format nil "An error of type ~a occurred: ~a" (type-of err) (format nil "~A" err)))
+                            (om-abort)
+                            )))
+    (let* ((box (om-view-container (object self)))
+           (scroller (om-view-container box))
+           (theeditor (editor (om-view-container box)))
+           (zoom (if (typep scroller 'om-scroller) (om-zoom-of scroller) 1.0))
+           (pos (let ((vp (om-view-position box)))
+                  (if (= zoom 1.0) vp (om-zoom-unscale-point vp zoom)))))
+      (unwind-protect
           (add-box-in-patch-panel str scroller pos)
         (omG-remove-element scroller box)
         (setf (text-view theeditor) nil)
@@ -408,8 +499,9 @@
 ; (decode-input-arguments "om+ 5 67")
  
 
+#|
 (defmethod exit-from-dialog ((self new-fun-enter-view) str)
-  (handler-bind ((error #'(lambda (err) 
+  (handler-bind ((error #'(lambda (err)
                             (when (om-view-container self)
 			      (setf (text-view (editor (om-view-container self))) nil)
 			      (om-remove-subviews (panel (editor (om-view-container self))) self))
@@ -421,15 +513,44 @@
            (pos (om-view-position box))
            (scroller (om-view-container box))
            (theeditor (editor (om-view-container box))))
-      
-      (unwind-protect 
-          
+
+      (unwind-protect
+
           (add-box-in-patch-panel str scroller pos)
 
         (omG-remove-element scroller box)
         (setf (text-view theeditor) nil)
         (om-remove-subviews (panel theeditor) self)
         (om-invalidate-view (panel theeditor))))))
+|#
+
+(defmethod exit-from-dialog ((self new-fun-enter-view) str)
+  (cond
+   ((not (om-str-parseable-as-lisp-p str))
+    (om-dismiss-ttybox-view self)
+    (om-warn-unreadable-materialize)
+    (om-abort))
+   (t
+    (handler-bind ((error #'(lambda (err)
+                              (when (om-view-container self)
+                                (setf (text-view (editor (om-view-container self))) nil)
+                                (om-remove-subviews (panel (editor (om-view-container self))) self))
+                              (om-beep)
+                              (print (format nil "An error of type ~a occurred: ~a"
+                                             (type-of err) (format nil "~A" err)))
+                              (om-abort))))
+      (let* ((box       (om-view-container (object self)))
+             (pos       (om-view-position box))
+             (scroller  (om-view-container box))
+             (theeditor (editor (om-view-container box)))
+             (zoom      (if (typep scroller 'om-scroller) (om-zoom-of scroller) 1.0))
+             (logical-pos (if (= zoom 1.0) pos (om-zoom-unscale-point pos zoom))))
+        (unwind-protect
+            (add-box-in-patch-panel str scroller logical-pos)
+          (omG-remove-element scroller box)
+          (setf (text-view theeditor) nil)
+          (om-remove-subviews (panel theeditor) self)
+          (om-invalidate-view (panel theeditor))))))))
 
 
 ;Paulo 28-09-2025
@@ -506,7 +627,10 @@
       (when (and (allow-rename newbox) (car args))
         (set-patch-box-name newbox text))
       
-      (omG-add-element scroller (make-frame-from-callobj newbox)))
+      (omG-add-element scroller
+                       (let ((*make-frame-zoom-context*
+                              (and (typep scroller 'om-scroller) (om-zoom-of scroller))))
+                         (make-frame-from-callobj newbox))))
     (when (equal funname 'comment)
       (reinit-size (car (frames newbox))))  
       

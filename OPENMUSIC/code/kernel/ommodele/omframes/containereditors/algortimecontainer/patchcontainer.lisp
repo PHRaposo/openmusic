@@ -109,6 +109,7 @@ Elements of patchPanels are instace of the boxframe class.#enddoc#
 ;(defparameter *current-panel* nil)
 
 
+#|
 (defmethod om-view-click-handler ((view patchPanel) where)
   (unless (and (get-selected-picts view)
                (handle-patch-pictures view (car (get-selected-picts view)) where))
@@ -122,12 +123,12 @@ Elements of patchPanels are instace of the boxframe class.#enddoc#
                    (newbox (omNG-make-new-boxcall item (om-make-point 22 22) (mk-unique-name thepatch (name item))))
                    pospanel pos)
               (if *new-obj-initial-pos*
-                  ;;; CASE 1 : a box is added from context-menu 
+                  ;;; CASE 1 : a box is added from context-menu
                   (progn
                     (setf (frame-position newbox) *new-obj-initial-pos*)
                     (omG-add-element thepatch (make-frame-from-callobj newbox))
                     )
-                ;;; CASE 2 : a box is added from window menu 
+                ;;; CASE 2 : a box is added from window menu
                 (progn (setf pospanel (om-mouse-position thepatch)
                              pos (om-mouse-position window))
                   (when (om-point-in-rect-p pos (om-pts-to-rect (om-make-point 0 0) (om-view-size window)))
@@ -148,12 +149,69 @@ Elements of patchPanels are instace of the boxframe class.#enddoc#
   (om-invalidate-view view t) ;;Solution (linux only?)
   ;(setf *current-panel* view)
    )
+|#
+
+(defmethod om-view-click-handler ((view patchPanel) where)
+  (unless (and (get-selected-picts view)
+               (handle-patch-pictures view (car (get-selected-picts view)) where))
+    (cond (*adding-a-box*
+        ;;; a box is being added ...
+        ;; *om-zoom-unscale-mouse-pos-p*: (om-mouse-position thepatch) returns LOGICAL.
+        (let ((*om-zoom-unscale-mouse-pos-p* t))
+          (when (equal (window view) (second *adding-a-box*))
+            (let* ((window (second *adding-a-box*))
+                   (item (first *adding-a-box*))
+                   (thepatch (get-patchpanel (editor window)))
+                   (newbox (omNG-make-new-boxcall item (om-make-point 22 22) (mk-unique-name thepatch (name item))))
+                   pospanel pos)
+              (if *new-obj-initial-pos*
+                  ;;; CASE 1 : a box is added from context-menu
+                  (progn
+                    (setf (frame-position newbox) *new-obj-initial-pos*)
+                    (omG-add-element thepatch
+                                     (let ((*make-frame-zoom-context*
+                                            (and (typep thepatch 'om-scroller) (om-zoom-of thepatch))))
+                                       (make-frame-from-callobj newbox))))
+                ;;; CASE 2 : a box is added from window menu
+                (progn (setf pospanel (om-mouse-position thepatch)
+                             pos (om-mouse-position window))
+                  (when (om-point-in-rect-p pos (om-pts-to-rect (om-make-point 0 0) (om-view-size window)))
+                    (setf (frame-position newbox) (borne-position pospanel))
+                    (omG-add-element thepatch
+                                     (let ((*make-frame-zoom-context*
+                                            (and (typep thepatch 'om-scroller) (om-zoom-of thepatch))))
+                                       (make-frame-from-callobj newbox))))))))
+          (setf *adding-a-box* nil)
+          (setf *new-obj-initial-pos* nil)))
+          ((and (om-shift-key-p) (om-option-key-p) (om-command-key-p)) ;maybe conflict!
+           (let* ((selected (get-actives view))
+                  (zoom (om-zoom-of view))
+                  (log-where (if (= zoom 1.0) where (om-zoom-unscale-point where zoom))))
+             (create-x-append-box view selected log-where)))
+          ;;; adding "list/x-append box" and autoconnect with selected boxes
+          ((and (om-shift-key-p) (om-command-key-p))
+           (let* ((selected (get-actives view))
+                  (zoom (om-zoom-of view))
+                  (log-where (if (= zoom 1.0) where (om-zoom-unscale-point where zoom))))
+             (create-list-box view selected log-where)))
+          (t (call-next-method))))
+  (om-invalidate-view view t) ;;Solution (linux only?)
+  ;(setf *current-panel* view)
+   )
 
 
+#|
 (defmethod om-view-doubleclick-handler ((Self patchPanel) Where)
   (when (equal self (call-next-method))
     (make-undefined-box self where)
     ))
+|#
+
+(defmethod om-view-doubleclick-handler ((self patchPanel) where)
+  (when (equal self (call-next-method))
+    (let* ((zoom (om-zoom-of self))
+           (logical-where (if (= zoom 1.0) where (om-zoom-unscale-point where zoom))))
+      (make-undefined-box self logical-where))))
 
 #|
 ;no!
@@ -271,9 +329,21 @@ because digit-char-p will not accept backspace and special om keys!"
 
 (defvar *cur-eval-panel* nil)
 
-(defmethod handle-key-event ((self patchPanel) char) 
+(defmethod handle-key-event ((self patchPanel) char)
+  (when (and (om-command-key-p) (om-zoom-applies-p self))
+    (cond
+     ((or (equal char #\=) (equal char #\+))
+      (om-zoom-numbox-apply self (* (om-zoom-of self) 1.1))
+      (return-from handle-key-event t))
+     ((equal char #\-)
+      (om-zoom-numbox-apply self (/ (om-zoom-of self) 1.1))
+      (return-from handle-key-event t))
+     ((equal char #\0)
+      (om-zoom-numbox-apply self 1.0)
+      (return-from handle-key-event t))))
   (modify-patch self)
-  (let* ((actives (get-actives self))
+  (let* ((*om-zoom-unscale-mouse-pos-p* t)
+         (actives (get-actives self))
          (connections (get-actives-connections self))
          (activeboxes (mapcar 'object actives))
          (boxes
@@ -431,13 +501,26 @@ because digit-char-p will not accept backspace and special om keys!"
 
 ;--------------Shortcuts
 ;Open the little view allowing create a box in 'self' by name, 'pos' is the position of the view.
+#|
 (defmethod make-undefined-box ((self patchPanel) pos)
    (let* ((thename (mk-unique-name self "undefined"))
           (new-box (omNG-make-new-boxcall 'undefined pos thename))
           (new-frame (make-frame-from-callobj new-box)))
      (om-select-window (window self))
      (omG-add-element self new-frame)
-     (open-ttybox (iconview new-frame)) 
+     (open-ttybox (iconview new-frame))
+     ))
+|#
+
+(defmethod make-undefined-box ((self patchPanel) pos)
+   (let* ((thename (mk-unique-name self "undefined"))
+          (new-box (omNG-make-new-boxcall 'undefined pos thename))
+          (new-frame (let ((*make-frame-zoom-context*
+                            (and (typep self 'om-scroller) (om-zoom-of self))))
+                       (make-frame-from-callobj new-box))))
+     (om-select-window (window self))
+     (omG-add-element self new-frame)
+     (open-ttybox (iconview new-frame))
      ))
 
 (defmethod delete-general :before ((self patchPanel))
@@ -452,13 +535,13 @@ because digit-char-p will not accept backspace and special om keys!"
    (let ((actives (remove nil (mapcar #'(lambda (box) (when (allow-remove box self) box)) (get-actives self))))
          (connections (get-actives-connections self)))
     (real-make-delete-before self actives)
-    (mapc #'(lambda (connec) 
+    (mapc #'(lambda (connec)
               (let* ((thebox (thebox connec))
                      (thein (nth (index connec) (inputs (object thebox)))))
                 (remove-connection thebox (index connec))
                 (setf (connected? thein) nil))) connections)
     (om-with-delayed-update (panel self)
-      (mapc #'(lambda (box) 
+      (mapc #'(lambda (box)
                 (omg-remove-element self box)) actives))
     (om-invalidate-view self)))
 
@@ -529,7 +612,9 @@ because digit-char-p will not accept backspace and special om keys!"
   "this is only for 'f' shortcut"
   (let* ((thename (mk-unique-name self "undefined"))
           (new-box (omNG-make-new-boxcall 'undefined pos thename))
-          (new-frame (make-frame-from-callobj new-box)))
+          (new-frame (let ((*make-frame-zoom-context*
+                            (and (typep self 'om-scroller) (om-zoom-of self))))
+                       (make-frame-from-callobj new-box))))
     (omG-add-element self new-frame)
     (make-tty-win (om-view-container self) (iconview new-frame) pos)
     (om-modal-dialog *tty-window*)
@@ -539,7 +624,9 @@ because digit-char-p will not accept backspace and special om keys!"
 (defmethod create-comment-box ((self patchPanel) pos)
   "this is for 'x' shortcut, for comments."
   (let* ((newbox (omNG-make-new-boxcall 'comment pos "comment"))
-         (new-frame (make-frame-from-callobj newbox)))
+         (new-frame (let ((*make-frame-zoom-context*
+                           (and (typep self 'om-scroller) (om-zoom-of self))))
+                      (make-frame-from-callobj newbox))))
     (om-select-window (window self))
     (omG-add-element self new-frame)
     ))
@@ -559,7 +646,9 @@ because digit-char-p will not accept backspace and special om keys!"
   "this is for 'c' shortcut, for comments editor."
   (let* ((thename (mk-unique-name self "comment"))
          (newbox (omNG-make-new-boxcall 'comment pos thename))
-         (new-frame (make-frame-from-callobj newbox))
+         (new-frame (let ((*make-frame-zoom-context*
+                           (and (typep self 'om-scroller) (om-zoom-of self))))
+                      (make-frame-from-callobj newbox)))
          (init (progn (setf om-edit::*comment-text* "")
                    (setf om-edit::*def-comment-edit-font* *comment-style*)
                    (setf om-edit::*comment-color* (oa::om-color-to-capi *comment-color*))))
@@ -619,8 +708,10 @@ because digit-char-p will not accept backspace and special om keys!"
   "Select boxes, then shift+click to connect them to a list object.
 The order of listed boxes is spatial, ie. from left to right."
   (when boxes
-    (let* ((newbox (omNG-make-new-lispboxcall 'list pos "list")) 
-           (new-frame (make-frame-from-callobj newbox))
+    (let* ((newbox (omNG-make-new-lispboxcall 'list pos "list"))
+           (new-frame (let ((*make-frame-zoom-context*
+                             (and (typep self 'om-scroller) (om-zoom-of self))))
+                        (make-frame-from-callobj newbox)))
            (order (mapcar 'second 
                           (sort-list 
                            (loop for i in boxes 
@@ -640,14 +731,16 @@ The order of listed boxes is spatial, ie. from left to right."
         (mapcar 'omg-unselect boxes)
         ))))
 
-(defmethod create-x-append-box ((self patchPanel) boxes pos) 
+(defmethod create-x-append-box ((self patchPanel) boxes pos)
   "Select boxes, then cmd+shift+click to connect them to a list object.
 The order of listed boxes is spatial, ie. from left to right."
   (when (> (length boxes) 1)
-    (let* ((newbox (omng-make-new-boxcall (make-instance 'omgenericfunction 
+    (let* ((newbox (omng-make-new-boxcall (make-instance 'omgenericfunction
                                                          :name 'x-append
-                                                         :icon 235 ) pos "x-append")) 
-           (new-frame (make-frame-from-callobj newbox))
+                                                         :icon 235 ) pos "x-append"))
+           (new-frame (let ((*make-frame-zoom-context*
+                             (and (typep self 'om-scroller) (om-zoom-of self))))
+                        (make-frame-from-callobj newbox)))
            (order (mapcar 'second 
                           (sort-list 
                            (loop for i in boxes 
@@ -728,6 +821,7 @@ The order of listed boxes is spatial, ie. from left to right."
    (when (direct-window-p self)
      (om-set-window-title (window self) (string+ "^" (name (object self))))))
 
+#|
 (defmethod add-window-buttons ((self patchPanel))
    "Add the input and output buttons at the top-button in 'self'."
    (when *patch-show-win-buttons*
@@ -737,7 +831,7 @@ The order of listed boxes is spatial, ie. from left to right."
                                          :position (om-make-point 5 5)
                                          :size (om-make-point 24 24)
                                          :action
-                                         #'(lambda (item) (declare (ignore item)) 
+                                         #'(lambda (item) (declare (ignore item))
                                              (modify-patch self)
                                              (add-output self nil))
                                          )
@@ -746,10 +840,35 @@ The order of listed boxes is spatial, ie. from left to right."
                                     :icon2 (if (add-input-enabled self 'in) "in-pushed" nil)
                                     :position (om-make-point 30 5)
                                        :size (om-make-point 24 24)
-                                       :action #'(lambda (item) (declare (ignore item)) 
+                                       :action #'(lambda (item) (declare (ignore item))
                                                    (modify-patch self)
                                                    (add-input self nil))
                                        ))))
+|#
+
+(defmethod add-window-buttons ((self patchPanel))
+   "Add the input and output buttons at the top-left in 'self'.
+    Suppressed under generic zoom: the editor bar hosts its own
+    in/out buttons and the canvas-level ones would duplicate."
+   (when (and *patch-show-win-buttons*
+              (not (om-zoom-applies-p self)))
+     (om-add-subviews self (om-make-view 'om-icon-button
+                                         :icon1 (if (add-output-enabled self 'out) "out" "out-disable")
+                                         :icon2 (if (add-output-enabled self 'out) "out-pushed" nil)
+                                         :position (om-make-point 5 5)
+                                         :size (om-make-point 24 24)
+                                         :action
+                                         #'(lambda (item) (declare (ignore item))
+                                             (modify-patch self)
+                                             (add-output self nil)))
+                      (om-make-view 'om-icon-button
+                                    :icon1 (if (add-input-enabled self 'in) "in" "in-disable")
+                                    :icon2 (if (add-input-enabled self 'in) "in-pushed" nil)
+                                    :position (om-make-point 30 5)
+                                       :size (om-make-point 24 24)
+                                       :action #'(lambda (item) (declare (ignore item))
+                                                   (modify-patch self)
+                                                   (add-input self nil))))))
    
 
 
@@ -757,28 +876,92 @@ The order of listed boxes is spatial, ie. from left to right."
 (defmethod add-output-enabled ((self patchpanel) type) t)
 
 
+(defun om-zoom-viewport-logical (pane)
+  "Return four LOGICAL values (pre-zoom) describing the visible viewport of PANE:
+   sx-log sy-log vw-log vh-log
+   - sx-log/sy-log: top-left of the visible region in the panel's logical coords
+     (slug position converted from VISUAL to LOGICAL when zoom != 1.0).
+   - vw-log/vh-log: width/height of the visible viewport in logical coords.
+   Used to place newly created boxes inside the user's current field of view.
+   PANE must itself be the om-scroller (om-zoom-of, not om-zoom-effective:
+   the latter looks at PANE's container and would always return *om-zoom-default*
+   for a top-level scroller, collapsing the LOGICAL conversion to identity)."
+  (let ((zoom (om-zoom-of pane))
+        (sx   (om-h-scroll-position pane))
+        (sy   (om-v-scroll-position pane)))
+    (let ((k (if (= zoom 0) 1.0 (/ 1.0 zoom))))
+      (multiple-value-bind (vw vh) (capi:simple-pane-visible-size pane)
+        (values (round (* sx k))
+                (round (* sy k))
+                (max 1 (round (* (or vw (vw pane)) k)))
+                (max 1 (round (* (or vh (vh pane)) k))))))))
+
+
+#|
 (defmethod add-input ((self patchpanel) position)
   (when (add-input-enabled self 'in)
-    (let* ((boxes (get-subframes self)) 
+    (let* ((boxes (get-subframes self))
            (i (length (list+ (find-class-boxes boxes 'selfInFrame) (find-class-boxes boxes 'InFrame))))
            (pos (or position (om-make-point (+ 5 (* i 50)) 45))))
       (omG-add-element self
-                       (make-frame-from-callobj 
+                       (make-frame-from-callobj
                         (make-new-patch-input (mk-unique-name self "input") i pos)))
       (set-field-size self)
       t)
     ))
+|#
 
+(defmethod add-input ((self patchpanel) position)
+  (when (add-input-enabled self 'in)
+    (let* ((boxes (get-subframes self))
+           (i     (length (list+ (find-class-boxes boxes 'selfInFrame)
+                                 (find-class-boxes boxes 'InFrame)))))
+      (multiple-value-bind (sx sy vw vh) (om-zoom-viewport-logical self)
+        (declare (ignore vw vh))
+        (let ((pos (or position
+                       (om-make-point (+ sx 10 (* i 50))
+                                      (+ sy 10)))))
+          (omG-add-element self
+                           (let ((*make-frame-zoom-context*
+                                  (and (typep self 'om-scroller) (om-zoom-of self))))
+                             (make-frame-from-callobj
+                              (make-new-patch-input (mk-unique-name self "input") i pos))))
+          (set-field-size self)
+          t)))))
+
+#|
 (defmethod add-output ((self patchpanel) position)
    (when (add-output-enabled self 'out)
-     (let* ((boxes (get-subframes self)) 
+     (let* ((boxes (get-subframes self))
             (i (length (list+ (find-class-boxes boxes 'tempOutFrame) (find-class-boxes boxes 'outFrame))))
             (pos (or position (om-make-point (+ 5 (* i 50)) 240))))
        (omG-add-element self
-                        (make-frame-from-callobj 
+                        (make-frame-from-callobj
                          (make-new-output (mk-unique-name self "output") i pos)))
        (set-field-size self)
        )))
+|#
+
+(defmethod add-output ((self patchpanel) position)
+  (when (add-output-enabled self 'out)
+    (let* ((boxes (get-subframes self))
+           (i     (length (list+ (find-class-boxes boxes 'tempOutFrame)
+                                 (find-class-boxes boxes 'outFrame)))))
+      (multiple-value-bind (sx sy vw vh) (om-zoom-viewport-logical self)
+        (declare (ignore vw))
+        ;; Reserve ~80 LOGICAL pixels of bottom space for the out-box itself
+        ;; (icon ~24 + chrome ~19 + name h ~13 ~ 56, plus visual margin so
+        ;; the box BOTTOM stays inside the current viewport and set-field-size
+        ;; does not transiently extend the scroller's max-range).
+        (let ((pos (or position
+                       (om-make-point (+ sx 10 (* i 50))
+                                      (+ sy (max 10 (- vh 80)))))))
+          (omG-add-element self
+                           (let ((*make-frame-zoom-context*
+                                  (and (typep self 'om-scroller) (om-zoom-of self))))
+                             (make-frame-from-callobj
+                              (make-new-output (mk-unique-name self "output") i pos))))
+          (set-field-size self))))))
 
 ;for calling objects slots modifiers
 (defmethod add-slots-enabled ((self patchpanel) type) t)
@@ -826,6 +1009,7 @@ The order of listed boxes is spatial, ie. from left to right."
 ;Tools
 ;--------------------------------
 
+#|
 (defun mk-connection-list (boxlist)
    "Save the connection beetwen boxes in 'boxlist' as a list.
 Elements of the list are list as (source-position source-output target-position target-input connection-points connection-color)."
@@ -838,9 +1022,36 @@ Elements of the list are list as (source-position source-output target-position 
                       (when (connected? input)
                         (let ((posi (position (first (connected? input)) boxlist :test 'equal)))
                           (when posi
-                            (push (list posi (second (connected? input)) i j 
-                                        (om-save-point-list (third (connected? input))) 
+                            (push (list posi (second (connected? input)) i j
+                                        (om-save-point-list (third (connected? input)))
                                         (fourth (connected? input))) rep))))
+                      (incf j))
+                  inputs)))
+    (reverse rep)))
+|#
+
+(defun mk-connection-list (boxlist)
+   "Save the connection beetwen boxes in 'boxlist' as a list.
+Elements of the list are list as (source-position source-output target-position target-input connection-points connection-color)."
+  (let* ((rep)
+         (zoom (let ((b (find-if #'(lambda (bx) (car (frames bx))) boxlist)))
+                 (if b (om-zoom-effective (car (frames b))) 1.0))))
+    (loop for box in boxlist
+          for i from 0 to (length boxlist) do
+          (let ((inputs (inputs box))
+                (j 0))
+            (mapc #'(lambda (input)
+                      (when (connected? input)
+                        (let ((posi (position (first (connected? input)) boxlist :test 'equal)))
+                          (when posi
+                            (let ((raw-pts (third (connected? input))))
+                              (push (list posi (second (connected? input)) i j
+                                          (om-save-point-list
+                                           (if (or (null raw-pts) (= zoom 1.0))
+                                               raw-pts
+                                               (mapcar #'(lambda (p) (om-zoom-unscale-point p zoom))
+                                                       raw-pts)))
+                                          (fourth (connected? input))) rep)))))
                       (incf j))
                   inputs)))
     (reverse rep)))
@@ -922,6 +1133,7 @@ Elements of the list are list as (source-position source-output target-position 
 (defvar *pict-mov-delta* nil)
 (defvar *initial-rectangle* nil)
 
+#|
 (defmethod handle-patch-pictures ((self patchPanel) sel where)
   (let ((w (om-point-h (pict-size sel)))
         (h (om-point-v (pict-size sel)))
@@ -937,7 +1149,7 @@ Elements of the list are list as (source-position source-output target-position 
             (setf *initial-rectangle* r)
             (om-init-motion-click self where :motion-action 'draw-resize-bg-pict :release-action 'draw-update-bg-pict)
             t)
-        (if (om-point-in-rect-p where r) 
+        (if (om-point-in-rect-p where r)
             (progn
               (setf *pict-mov-size* (pict-size sel))
               (setf *pict-mov-delta* (om-make-point (- (om-point-h where) x0) (- (om-point-v where) y0)))
@@ -948,8 +1160,42 @@ Elements of the list are list as (source-position source-output target-position 
             (setf (selected-p sel) nil)
             (invalidate-picture sel self)
             nil))))))
+|#
+
+(defmethod handle-patch-pictures ((self patchPanel) sel where)
+  ;; `where` arrives VISUAL (CAPI). pict-pos/pict-size are LOGICAL.
+  ;; Hit-test in LOGICAL; *pict-mov-delta* stored LOGICAL.
+  ;; om-init-motion-click consumes VISUAL stream, so pass original `where`.
+  (let* ((zoom      (om-zoom-of self))
+         (log-where (if (= zoom 1.0) where (om-zoom-unscale-point where zoom)))
+         (w  (om-point-h (pict-size sel)))
+         (h  (om-point-v (pict-size sel)))
+         (x0 (om-point-h (pict-pos sel)))
+         (y0 (om-point-v (pict-pos sel))))
+    (let ((r (om-make-rect x0 y0 (+ x0 w) (+ y0 h)))
+          (resizerect (om-make-rect (+ x0 w -8) (+ y0 h -8) (+ x0 w) (+ y0 h))))
+      (modify-patch self)
+      (if (om-point-in-rect-p log-where resizerect)
+          (progn
+            (setf *pict-mov-size* (pict-size sel))
+            (setf *pict-mov-delta* log-where)
+            (setf *initial-rectangle* r)
+            (om-init-motion-click self where :motion-action 'draw-resize-bg-pict :release-action 'draw-update-bg-pict)
+            t)
+        (if (om-point-in-rect-p log-where r)
+            (progn
+              (setf *pict-mov-size* (pict-size sel))
+              (setf *pict-mov-delta* (om-make-point (- (om-point-h log-where) x0) (- (om-point-v log-where) y0)))
+              (setf *initial-rectangle* r)
+              (om-init-motion-click self where :motion-action 'draw-move-bg-pict :release-action 'draw-update-bg-pict)
+              t)
+          (progn
+            (setf (selected-p sel) nil)
+            (invalidate-picture sel self)
+            nil))))))
 
 
+#|
 (defmethod draw-move-bg-pict ((self patchPanel) pos prev-pos)
   (let ((sel (car (get-selected-picts self))))
     (when sel
@@ -959,7 +1205,7 @@ Elements of the list are list as (source-position source-output target-position 
            (unless (om-points-equal-p (pict-pos sel) newp)
              (setf (pict-pos sel) newp)
              (when *initial-rectangle*
-               (om-invalidate-corners self (om-rect-topleft *initial-rectangle*) 
+               (om-invalidate-corners self (om-rect-topleft *initial-rectangle*)
                                       (om-add-points (om-rect-bottomright *initial-rectangle*) (om-make-point 4 4)))
                (invalidate-picture sel self)
                )
@@ -975,8 +1221,55 @@ Elements of the list are list as (source-position source-output target-position 
            (unless (om-points-equal-p (pict-size sel) newp)
              (setf (pict-size sel) newp)
              (when *initial-rectangle*
-               (om-invalidate-corners self (om-rect-topleft *initial-rectangle*) 
+               (om-invalidate-corners self (om-rect-topleft *initial-rectangle*)
                                       (om-add-points (om-rect-bottomright *initial-rectangle*) (om-make-point 4 4)))
+               (invalidate-picture sel self)
+               )
+             ))
+         (om-beep)))))
+|#
+
+(defmethod draw-move-bg-pict ((self patchPanel) pos prev-pos)
+  ;; pos arrives VISUAL from CAPI motion stream.
+  ;; *pict-mov-delta* is LOGICAL; pict-pos is LOGICAL.
+  ;; om-invalidate-corners operates VISUAL.
+  (let* ((sel  (car (get-selected-picts self)))
+         (zoom (om-zoom-of self)))
+    (when sel
+      (if (om-view-contains-point-p self pos)
+          (let* ((log-pos (if (= zoom 1.0) pos (om-zoom-unscale-point pos zoom)))
+                 (newp (om-make-point (- (om-point-h log-pos) (om-point-h *pict-mov-delta*))
+                                      (- (om-point-v log-pos) (om-point-v *pict-mov-delta*)))))
+           (unless (om-points-equal-p (pict-pos sel) newp)
+             (setf (pict-pos sel) newp)
+             (when *initial-rectangle*
+               (let* ((tl     (om-rect-topleft *initial-rectangle*))
+                      (br     (om-add-points (om-rect-bottomright *initial-rectangle*) (om-make-point 4 4)))
+                      (vis-tl (if (= zoom 1.0) tl (om-zoom-scale-point tl zoom)))
+                      (vis-br (if (= zoom 1.0) br (om-zoom-scale-point br zoom))))
+                 (om-invalidate-corners self vis-tl vis-br))
+               (invalidate-picture sel self)
+               )
+             ))
+         (om-beep)))))
+
+(defmethod draw-resize-bg-pict ((Self patchPanel) pos prev-pos)
+  ;; pos arrives VISUAL. *pict-mov-size* / *pict-mov-delta* LOGICAL.
+  (let* ((sel  (car (get-selected-picts self)))
+         (zoom (om-zoom-of self)))
+     (when sel
+       (if (om-view-contains-point-p self pos)
+         (let* ((log-pos (if (= zoom 1.0) pos (om-zoom-unscale-point pos zoom)))
+                (newp (om-make-point (+ (om-point-h *pict-mov-size*) (- (om-point-h log-pos) (om-point-h *pict-mov-delta*)))
+                                     (+ (om-point-v *pict-mov-size*) (- (om-point-v log-pos) (om-point-v *pict-mov-delta*))))))
+           (unless (om-points-equal-p (pict-size sel) newp)
+             (setf (pict-size sel) newp)
+             (when *initial-rectangle*
+               (let* ((tl     (om-rect-topleft *initial-rectangle*))
+                      (br     (om-add-points (om-rect-bottomright *initial-rectangle*) (om-make-point 4 4)))
+                      (vis-tl (if (= zoom 1.0) tl (om-zoom-scale-point tl zoom)))
+                      (vis-br (if (= zoom 1.0) br (om-zoom-scale-point br zoom))))
+                 (om-invalidate-corners self vis-tl vis-br))
                (invalidate-picture sel self)
                )
              ))
@@ -985,9 +1278,20 @@ Elements of the list are list as (source-position source-output target-position 
 (defmethod draw-update-bg-pict ((self patchpanel) initpos pos)
   (om-invalidate-view self))
 
+#|
 (defmethod invalidate-picture ((self patch-picture) view)
   (om-invalidate-corners view (pict-pos self) (om-make-point (+ (om-point-h (pict-pos self)) (om-point-h (pict-size self)) 4)
                                                              (+ (om-point-v (pict-pos self)) (om-point-v (pict-size self)) 4))))
+|#
+
+(defmethod invalidate-picture ((self patch-picture) view)
+  (let* ((zoom (om-zoom-of view))
+         (tl   (pict-pos self))
+         (br   (om-make-point (+ (om-point-h (pict-pos self)) (om-point-h (pict-size self)) 4)
+                              (+ (om-point-v (pict-pos self)) (om-point-v (pict-size self)) 4)))
+         (vis-tl (if (= zoom 1.0) tl (om-zoom-scale-point tl zoom)))
+         (vis-br (if (= zoom 1.0) br (om-zoom-scale-point br zoom))))
+    (om-invalidate-corners view vis-tl vis-br)))
 
 (defmethod delete-general :around ((self patchPanel))
    (let ((sel (car (get-selected-picts self))))
@@ -1007,15 +1311,32 @@ Elements of the list are list as (source-position source-output target-position 
           (om-invalidate-corners self (pict-pos selpic) (om-make-point (+ (om-point-h (pict-pos selpic)) (max (om-point-h init-size) (om-point-h (pict-size selpic))) 4)
                                                                        (+ (om-point-v (pict-pos selpic)) (max (om-point-v init-size) (om-point-v (pict-size selpic))) 4)))))))
 
+#|
 (defmethod om-view-cursor ((self patchPanel))
   (if (and *adding-a-box* (equal (window self) (second *adding-a-box*)))
-    *om-box-cursor* 
+    *om-box-cursor*
     (let ((sel (car (get-selected-picts self))))
        (if (and sel (om-point-in-rect-p (om-mouse-position self)
-                                        (om-make-rect (+ (om-point-h (pict-pos sel)) (om-point-h (pict-size sel)) -8) 
-                                                      (+ (om-point-v (pict-pos sel)) (om-point-v (pict-size sel)) -8) 
-                                                      (+ (om-point-h (pict-pos sel)) (om-point-h (pict-size sel))) 
+                                        (om-make-rect (+ (om-point-h (pict-pos sel)) (om-point-h (pict-size sel)) -8)
+                                                      (+ (om-point-v (pict-pos sel)) (om-point-v (pict-size sel)) -8)
+                                                      (+ (om-point-h (pict-pos sel)) (om-point-h (pict-size sel)))
                                                       (+ (om-point-v (pict-pos sel)) (om-point-v (pict-size sel))))))
+           *om-resize-cursor*
+         (call-next-method)))))
+|#
+
+(defmethod om-view-cursor ((self patchPanel))
+  (if (and *adding-a-box* (equal (window self) (second *adding-a-box*)))
+    *om-box-cursor*
+    (let* ((sel  (car (get-selected-picts self)))
+           (zoom (if sel (om-zoom-of self) 1.0))
+           (vis-pos  (when sel (if (= zoom 1.0) (pict-pos  sel) (om-zoom-scale-point (pict-pos  sel) zoom))))
+           (vis-size (when sel (if (= zoom 1.0) (pict-size sel) (om-zoom-scale-point (pict-size sel) zoom)))))
+       (if (and sel (om-point-in-rect-p (om-mouse-position self)
+                                        (om-make-rect (+ (om-point-h vis-pos) (om-point-h vis-size) -8)
+                                                      (+ (om-point-v vis-pos) (om-point-v vis-size) -8)
+                                                      (+ (om-point-h vis-pos) (om-point-h vis-size))
+                                                      (+ (om-point-v vis-pos) (om-point-v vis-size)))))
            *om-resize-cursor*
          (call-next-method)))))
 
@@ -1023,7 +1344,10 @@ Elements of the list are list as (source-position source-output target-position 
 (defun add-special-box (type pos container)
   (let ((box (get-new-box-from-type type pos container)))
     (when box
-      (omG-add-element container (make-frame-from-callobj box)))))
+      (omG-add-element container
+                       (let ((*make-frame-zoom-context*
+                              (and (typep container 'om-scroller) (om-zoom-of container))))
+                         (make-frame-from-callobj box))))))
 
 
 
@@ -1051,48 +1375,111 @@ Elements of the list are list as (source-position source-output target-position 
         )
       ))
 
+#|
 (defmethod om-get-menu-context ((self PatchPanel))
   (let ((posi (om-mouse-position self))
         (sel (car (get-selected-picts self))))
     (if sel
         (get-pict-menu-context sel self)
-      (list 
-       (om-new-leafmenu "Comment" #'(lambda () 
+      (list
+       (om-new-leafmenu "Comment" #'(lambda ()
                                       (let ((newbox (omNG-make-new-boxcall 'comment posi "comment")))
                                         (when newbox
                                           (omG-add-element self (make-frame-from-callobj newbox))
                                           (reinit-size (car (frames  newbox)))))))
-       (om-new-leafmenu "Picture" #'(lambda () 
+       (om-new-leafmenu "Picture" #'(lambda ()
                                       (make-bg-pict self posi)))
-       (list 
+       (list
         (om-package-fun2menu *om-package-tree* nil #'(lambda (f) (add-box-from-menu f posi)))
         (om-package-classes2menu *om-package-tree* nil #'(lambda (c) (add-box-from-menu c posi)))
         )
-       (list 
-        (om-new-menu "Internal..." 
-                     (om-new-leafmenu "Patch" #'(lambda () (omG-add-element self (make-frame-from-callobj 
-                                                                                  (omNG-make-new-boxcall 
+       (list
+        (om-new-menu "Internal..."
+                     (om-new-leafmenu "Patch" #'(lambda () (omG-add-element self (make-frame-from-callobj
+                                                                                  (omNG-make-new-boxcall
                                                                                    (make-instance 'OMPatchAbs :name "mypatch" :icon 210)
                                                                                    posi (mk-unique-name self "mypatch"))))))
-                     (om-new-leafmenu "Maquette" #'(lambda () (omG-add-element self (make-frame-from-callobj 
-                                                                                     (omNG-make-new-boxcall 
+                     (om-new-leafmenu "Maquette" #'(lambda () (omG-add-element self (make-frame-from-callobj
+                                                                                     (omNG-make-new-boxcall
                                                                                       (make-instance 'OMMaqAbs :name "mymaquette" :icon 265)
                                                                                       posi (mk-unique-name self "mymaquette"))))))
                      (om-new-leafmenu "Loop" #'(lambda () (add-box-from-menu (fdefinition 'omloop) posi)))
-                     (om-new-leafmenu "Lisp Function" #'(lambda () (omG-add-element self 
-                                                                                    (make-frame-from-callobj 
-                                                                                     (omNG-make-new-boxcall 
+                     (om-new-leafmenu "Lisp Function" #'(lambda () (omG-add-element self
+                                                                                    (make-frame-from-callobj
+                                                                                     (omNG-make-new-boxcall
                                                                                       (make-instance 'OMLispPatchAbs :name "lispfunction" :icon 123)
                                                                                       posi (mk-unique-name self "lispfunction"))))))))
        (list
         (om-new-leafmenu "Input" #'(lambda () (add-input self posi)) nil (add-input-enabled self 'in))
         (om-new-leafmenu "Output" #'(lambda () (add-output self posi)) nil (add-output-enabled self 'out))
-        (om-new-menu "TemporalBoxes" 
+        (om-new-menu "TemporalBoxes"
                      (om-new-leafmenu "Self Input" #'(lambda () (add-special-box 'tempin posi self)) nil (add-input-enabled self 'tempin))
                      (om-new-leafmenu "Maq. Self Input" #'(lambda () (add-special-box 'maq-tempin posi self)) nil (add-input-enabled self 'maq-tempin))
                      (om-new-leafmenu "Temporal Output" #'(lambda () (add-special-box 'tempout posi self)) nil (add-output-enabled self 'tempout)))
         )
-       (om-new-leafmenu "Last Saved"  #'(lambda () (window-last-saved (editor self))) nil (if (and 
+       (om-new-leafmenu "Last Saved"  #'(lambda () (window-last-saved (editor self))) nil (if (and
+                                                                                               (mypathname (object self))
+                                                                                               (not (subtypep (class-of self) 'methodpanel))) t nil))
+       ))))
+|#
+
+(defmethod om-get-menu-context ((self PatchPanel))
+  (let* ((*om-zoom-unscale-mouse-pos-p* t)
+         (posi (om-mouse-position self))
+         (sel  (car (get-selected-picts self))))
+    (if sel
+        (get-pict-menu-context sel self)
+      (list
+       (om-new-leafmenu "Comment" #'(lambda ()
+                                      (let ((newbox (omNG-make-new-boxcall 'comment posi "comment")))
+                                        (when newbox
+                                          (omG-add-element self
+                                                           (let ((*make-frame-zoom-context*
+                                                                  (and (typep self 'om-scroller) (om-zoom-of self))))
+                                                             (make-frame-from-callobj newbox)))
+                                          (reinit-size (car (frames  newbox)))))))
+       (om-new-leafmenu "Picture" #'(lambda ()
+                                      (make-bg-pict self posi)))
+       (list
+        (om-package-fun2menu *om-package-tree* nil #'(lambda (f) (add-box-from-menu f posi)))
+        (om-package-classes2menu *om-package-tree* nil #'(lambda (c) (add-box-from-menu c posi)))
+        )
+       (list
+        (om-new-menu "Internal..."
+                     (om-new-leafmenu "Patch" #'(lambda ()
+                                                  (omG-add-element self
+                                                                   (let ((*make-frame-zoom-context*
+                                                                          (and (typep self 'om-scroller) (om-zoom-of self))))
+                                                                     (make-frame-from-callobj
+                                                                      (omNG-make-new-boxcall
+                                                                       (make-instance 'OMPatchAbs :name "mypatch" :icon 210)
+                                                                       posi (mk-unique-name self "mypatch")))))))
+                     (om-new-leafmenu "Maquette" #'(lambda ()
+                                                     (omG-add-element self
+                                                                      (let ((*make-frame-zoom-context*
+                                                                             (and (typep self 'om-scroller) (om-zoom-of self))))
+                                                                        (make-frame-from-callobj
+                                                                         (omNG-make-new-boxcall
+                                                                          (make-instance 'OMMaqAbs :name "mymaquette" :icon 265)
+                                                                          posi (mk-unique-name self "mymaquette")))))))
+                     (om-new-leafmenu "Loop" #'(lambda () (add-box-from-menu (fdefinition 'omloop) posi)))
+                     (om-new-leafmenu "Lisp Function" #'(lambda ()
+                                                          (omG-add-element self
+                                                                           (let ((*make-frame-zoom-context*
+                                                                                  (and (typep self 'om-scroller) (om-zoom-of self))))
+                                                                             (make-frame-from-callobj
+                                                                              (omNG-make-new-boxcall
+                                                                               (make-instance 'OMLispPatchAbs :name "lispfunction" :icon 123)
+                                                                               posi (mk-unique-name self "lispfunction")))))))))
+       (list
+        (om-new-leafmenu "Input" #'(lambda () (add-input self posi)) nil (add-input-enabled self 'in))
+        (om-new-leafmenu "Output" #'(lambda () (add-output self posi)) nil (add-output-enabled self 'out))
+        (om-new-menu "TemporalBoxes"
+                     (om-new-leafmenu "Self Input" #'(lambda () (add-special-box 'tempin posi self)) nil (add-input-enabled self 'tempin))
+                     (om-new-leafmenu "Maq. Self Input" #'(lambda () (add-special-box 'maq-tempin posi self)) nil (add-input-enabled self 'maq-tempin))
+                     (om-new-leafmenu "Temporal Output" #'(lambda () (add-special-box 'tempout posi self)) nil (add-output-enabled self 'tempout)))
+        )
+       (om-new-leafmenu "Last Saved"  #'(lambda () (window-last-saved (editor self))) nil (if (and
                                                                                                (mypathname (object self))
                                                                                                (not (subtypep (class-of self) 'methodpanel))) t nil))
        ))))
@@ -1174,6 +1561,139 @@ Elements of the list are list as (source-position source-output target-position 
                                (y (round (* (om-point-y siz) 0.8))))
                      (change-boxframe-size (car (frames (object ob))) (om-make-point x y)))))))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Zoom editor bar (hosts in/out buttons and a percent numbox)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defclass om-patch-editor-bar (om-view) ())
+
+;; methodEditor (defmethod for an OMgenericFunction) uses a dedicated bar
+;; whose IN button is a TYPED-INPUT-BUTTON: clicking adds a generic typed
+;; input; dropping an object on it creates a typed input matching the
+;; dropped object's class. The OM-VIEW-DROP mixin installs the CAPI
+;; :drop-callback so drops on pinboard-object children (the IN button)
+;; reach OM-DRAG-RECEIVE / PERFORM-DROP.
+(defclass generic-function-zoom-bar (om-patch-editor-bar om-view-drop) ())
+
+(defclass om-zoom-toolbar-view (om-view) ()
+  (:documentation "Bypasses the patchpanel click-zone check on om-icon-button."))
+
+(defparameter +om-zoom-bar-h+ 26)
+
+;; :om-zoom-numbox holds the om-zoom-pop-up widget (named for legacy callers).
+(defun om-zoom-sync-numbox (pane new-zoom)
+  (let ((widget (capi:capi-object-property pane :om-zoom-numbox)))
+    (when widget
+      (om-set-zoom-pop-up-value widget (round (* new-zoom 100))))))
+
+;; Anchored at TOP-LEFT (0,0) so zoom in/out stays pinned at the visible origin.
+(defun om-zoom-numbox-apply (pane new-zoom)
+  (om-zoom-update pane new-zoom 0 0))
+
+;; Maquette panels run their own native zoom; skip the editor zoom bar.
+(defun om-zoom-editor-applies-p (editor)
+  (and editor
+       (not (and (slot-exists-p editor 'object)
+                 (slot-boundp editor 'object)
+                 (maquette-p (object editor))))))
+
+(defmethod panel-position ((self patchEditor))
+  (if (om-zoom-editor-applies-p self)
+      (om-make-point 0 +om-zoom-bar-h+)
+      (call-next-method)))
+
+(defmethod panel-size ((self patchEditor))
+  (if (om-zoom-editor-applies-p self)
+      (om-make-point (w self) (- (h self) +om-zoom-bar-h+))
+      (call-next-method)))
+
+(defgeneric om-zoom-editor-bar-build (editor)
+  (:documentation "Build and install the zoom bar on EDITOR; return the bar view."))
+
+(defmethod om-zoom-editor-bar-build ((editor patchEditor))
+  (let* ((panel (panel editor))
+         (zoom  (if (typep panel 'om-scroller) (om-zoom-of panel) 1.0))
+         (pct   (round (* zoom 100)))
+         (bar (om-make-view 'om-patch-editor-bar
+                            :position (om-make-point 0 0)
+                            :size (om-make-point (w editor) +om-zoom-bar-h+)
+                            :bg-color *controls-color*))
+         (out-enabled (add-output-enabled panel 'out))
+         (in-enabled  (add-input-enabled  panel 'in))
+         (out-btn (om-make-view
+                   'om-icon-button
+                   :position (om-make-point 5 1)
+                   :size (om-make-point 24 24)
+                   :icon1 (if out-enabled "out" "out-disable")
+                   :icon2 (if out-enabled "out-pushed" nil)
+                   :action (when out-enabled
+                             #'(lambda (item)
+                                 (declare (ignore item))
+                                 (modify-patch panel)
+                                 (add-output panel nil)))))
+         (in-btn (om-make-view
+                  'om-icon-button
+                  :position (om-make-point 30 1)
+                  :size (om-make-point 24 24)
+                  :icon1 (if in-enabled "in" "in-disable")
+                  :icon2 (if in-enabled "in-pushed" nil)
+                  :action (when in-enabled
+                            #'(lambda (item)
+                                (declare (ignore item))
+                                (modify-patch panel)
+                                (add-input panel nil)))))
+         (zoom-bg (om-make-dialog-item
+                   'om-static-text
+                   (om-make-point 60 1)
+                   (om-make-point 95 24)
+                   ""
+                   :font *om-default-font1*
+                   :bg-color *controls-color*))
+         (zoom-label (om-make-dialog-item
+                      'om-static-text
+                      (om-make-point 65 4)
+                      (om-make-point 35 18)
+                      "Zoom"
+                      :font *om-default-font1*
+                      :bg-color *controls-color*))
+         (numbox (om-make-view
+                  'om-zoom-pop-up
+                  :position (om-make-point 105 4)
+                  :size (om-make-point 60 18)
+                  :value pct
+                  :presets '(50 100 150 200 300 400)
+                  :font *om-default-font1*
+                  :bg-color *om-white-color*
+                  :di-action #'(lambda (widget new-pct)
+                                 (declare (ignore widget))
+                                 (om-zoom-numbox-apply panel (/ new-pct 100.0))))))
+    (om-add-subviews bar out-btn in-btn zoom-bg zoom-label numbox)
+    (om-add-subviews editor bar)
+    (when panel
+      (setf (capi:capi-object-property panel :om-zoom-numbox) numbox))
+    (setf (capi:capi-object-property editor :om-zoom-editor-bar) bar)
+    bar))
+
+(defmethod initialize-instance ((self patchEditor) &rest initargs)
+  (apply #'call-next-method self initargs)
+  (when (om-zoom-editor-applies-p self)
+    (om-zoom-editor-bar-build self)))
+
+(defmethod update-subviews ((self patchEditor))
+  (call-next-method)
+  (when (om-zoom-editor-applies-p self)
+    (let ((bar (capi:capi-object-property self :om-zoom-editor-bar)))
+      (when bar
+        (om-set-view-size bar (om-make-point (w self) +om-zoom-bar-h+))))))
+
+(defmethod om-zoom-sync-display ((pane patchPanel) factor)
+  (om-zoom-sync-numbox pane factor)
+  (let* ((editor (om-view-container pane))
+         (patch  (and editor (object editor))))
+    (when (and patch (typep patch 'OMPersistantObject)
+               (not (capi:capi-object-property pane :om-zoom-restoring-p)))
+      (set-win-zoom patch factor))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

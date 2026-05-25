@@ -503,6 +503,7 @@ The precision of the BPF-Lib and editor is the maximum precision (<decimals> val
 
 
 
+#|
 (defmethod draw-obj-in-rect ((self bpf) x x1 y y1 edparams view)
    (om-with-focused-view view
      (om-with-fg-color view (bpfcolor self)
@@ -510,6 +511,23 @@ The precision of the BPF-Lib and editor is the maximum precision (<decimals> val
 
 (defmethod draw-mini-view ((self t) (value bpf))
    (draw-obj-in-rect value 3 (- (w self) 3) 3 (- (h self) 3) (give-bpf-range value) self ))
+|#
+
+(defmethod draw-obj-in-rect ((self bpf) x x1 y y1 edparams view)
+  (let* ((zoom (om-zoom-effective view))
+         (pen  (max 1 (round zoom)))
+         (*om-zoom-mini-helper-scale* zoom))
+    (declare (special *om-zoom-mini-helper-scale*))
+    (om-with-focused-view view
+      (om-with-line-size pen
+        (om-with-fg-color view (bpfcolor self)
+          (draw-bpf-in-rect self x x1 y y1 (give-bpf-range self)))))))
+
+(defmethod draw-mini-view ((self t) (value bpf))
+  (let* ((zoom   (om-zoom-effective self))
+         (margin (max 1 (round (* 3 zoom)))))
+    (draw-obj-in-rect value margin (- (w self) margin) margin (- (h self) margin)
+                      (give-bpf-range value) self)))
 
 
 (defun get-minmax (list i winsize)
@@ -529,6 +547,7 @@ The precision of the BPF-Lib and editor is the maximum precision (<decimals> val
               (om-draw-line j (+ piy0 (om-point-v min)) j (+ piy0 (om-point-v max))))))))
 
 
+#|
 (defun draw-bpf-in-rect (bpf x x1 y y1 ranges)
   (let* ((pixels (- x1 x))
         (points (length (point-list bpf)))
@@ -553,6 +572,39 @@ The precision of the BPF-Lib and editor is the maximum precision (<decimals> val
 				 (+ x (om-point-h next-pixel)) (+ y (om-point-v next-pixel)))))
                (when draw-points (om-fill-rect (+ x (- (om-point-h pix-point) 1)) (+ y (- (om-point-v pix-point) 1)) 3 3))
                )))))
+|#
+
+(defun draw-bpf-in-rect (bpf x x1 y y1 ranges)
+  (declare (special *om-zoom-mini-helper-scale*))
+  (let* ((pixels (- x1 x))
+         (points (length (point-list bpf)))
+         (draw-points (< points 50))
+         (s    (if (boundp '*om-zoom-mini-helper-scale*) *om-zoom-mini-helper-scale* 1.0))
+         (mark (max 1 (round (* 3 s))))
+         (off  (max 0 (round s))))
+    (if (> points (* 4 pixels))
+        (min-max-draw-bpf (point-list bpf) (- x1 x) (- y1 y) ranges x y)
+        (loop for point-list on (point-list bpf) do
+	     (let* ((thepoint (car point-list))
+		    (pix-point (point-to-pixel-with-sizes ranges thepoint (- x1 x) (- y1 y)))
+		    (points-prev-next (give-prev+next-x bpf thepoint))
+		    (prev-point (first points-prev-next))
+		    (next-point (second points-prev-next)))
+	       (when prev-point
+		 (let ((prev-pixel (point-to-pixel-with-sizes ranges prev-point (- x1 x) (- y1 y))))
+		   (om-draw-line (+ x (om-point-h prev-pixel)) (+ y (om-point-v prev-pixel))
+				 (+ x (om-point-h pix-point)) (+ y (om-point-v pix-point)))))
+	       (when (or (and next-point (null (second point-list)))
+			 (and (second point-list) next-point ;; ?
+			      (not (equal next-point (second point-list)))))
+		 (let ((next-pixel (point-to-pixel-with-sizes ranges next-point (- x1 x) (- y1 y))))
+		   (om-draw-line (+ x (om-point-h pix-point)) (+ y (om-point-v pix-point))
+				 (+ x (om-point-h next-pixel)) (+ y (om-point-v next-pixel)))))
+               (when draw-points
+                 (om-fill-rect (+ x (- (om-point-h pix-point) off))
+                               (+ y (- (om-point-v pix-point) off))
+                               mark mark))
+               )))))
 
 
 
@@ -565,12 +617,26 @@ The precision of the BPF-Lib and editor is the maximum precision (<decimals> val
                     minimize (third range) into y
                     finally (return (list x x1 y y1))))
 
+#|
 (defmethod draw-obj-in-rect ((self  bpf-lib) x x1 y y1 edparams  view)
    (let* ((bpf-list (bpf-list self))
           (ranges (get-miniview-bpf-range bpf-list)))
      (loop for bpf in bpf-list do
            (om-with-fg-color view (bpfcolor bpf)
              (draw-bpf-in-rect bpf x x1 y y1 ranges)))))
+|#
+
+(defmethod draw-obj-in-rect ((self  bpf-lib) x x1 y y1 edparams  view)
+  (let* ((zoom     (om-zoom-effective view))
+         (pen      (max 1 (round zoom)))
+         (bpf-list (bpf-list self))
+         (ranges   (get-miniview-bpf-range bpf-list))
+         (*om-zoom-mini-helper-scale* zoom))
+    (declare (special *om-zoom-mini-helper-scale*))
+    (om-with-line-size pen
+      (loop for bpf in bpf-list do
+            (om-with-fg-color view (bpfcolor bpf)
+              (draw-bpf-in-rect bpf x x1 y y1 ranges))))))
 
 
 ;;; edparams

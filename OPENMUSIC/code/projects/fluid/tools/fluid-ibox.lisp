@@ -72,71 +72,168 @@
    `(apply 'set-dialog-item-params (list ,(value self) ,self (list ,.(decode self)))))
 
 
-(defmethod make-outputs-from-names ((self FLDIntbox) value module) 
+#|
+(defmethod make-outputs-from-names ((self FLDIntbox) value module)
    "The outputs of these boxes depent from the initarg slots of the class reference."
    (let ((numouts (numouts self))
          (nameouts (get-outs-name value)))
      (loop for i from 0 to (- numouts 1) do
            (let ((thenewout (om-make-view (get-out-class self)
-                              :position (om-make-point (- (* (+ i 1) (round (w module) (+ numouts 1))) 4) 
+                              :position (om-make-point (- (* (+ i 1) (round (w module) (+ numouts 1))) 4)
                                                          (- (h module) 9))
                               :size (om-make-point 8 8)
                               :help-spec (nth i nameouts)
                               :index i)))
              (push thenewout (outframes module))
              (om-add-subviews module thenewout)))))
+|#
 
+(defmethod make-outputs-from-names ((self FLDIntbox) value module)
+   "The outputs of these boxes depent from the initarg slots of the class reference."
+   (let* ((numouts (numouts self))
+          (nameouts (get-outs-name value))
+          (zoom    (or *make-frame-zoom-context* 1.0))
+          (scale-p (and (numberp zoom) (/= zoom 1.0)))
+          (io-size (if scale-p (max 1 (round (* 8 zoom))) 8))
+          (off-x   (if scale-p (round (* 4 zoom)) 4))
+          (off-y   (if scale-p (round (* 9 zoom)) 9)))
+     (loop for i from 0 to (- numouts 1) do
+           (let ((thenewout (om-make-view (get-out-class self)
+                              :position (om-make-point (- (* (+ i 1) (round (w module) (+ numouts 1))) off-x)
+                                                         (- (h module) off-y))
+                              :size (om-make-point io-size io-size)
+                              :help-spec (nth i nameouts)
+                              :index i)))
+             (push thenewout (outframes module))
+             (om-add-subviews module thenewout)))))
+
+#|
 (defmethod make-frame-from-callobj ((self FLDIntbox))
    "Make a simple frame for the editor factory 'self'."
    (let ((name (string-downcase (name self)))
          (defsize (get-boxsize self))
          (numouts (numouts self))
          (numins (length (inputs self)))
-         (index 0) 
+         (index 0)
          (module (om-make-view (get-frame-class self)
                                :name (name (value self))
                                :position (frame-position self)
                                :object self))
          title)
-    
-     (unless (frame-size self) 
-       (setf (frame-size self) (om-make-point 
-                                (apply #'max (list (om-point-h defsize) (* 8 numouts) (* 8 numins))) 
+
+     (unless (frame-size self)
+       (setf (frame-size self) (om-make-point
+                                (apply #'max (list (om-point-h defsize) (* 8 numouts) (* 8 numins)))
                                 (om-point-v defsize)))
        )
 
      (setf (inputframes module) (mapcar #'(lambda (input)
-                                            
+
                                             (setf index (+ index 1))
                                             (om-make-view (get-input-class-frame self)
                                                             :object input
                                                             :help-spec (string+ "<" (string-downcase (name input))
                                                                                 "> " (doc-string input))
                                                             :size (om-make-point 8 8)
-                                                            :position (om-make-point 
-                                                                       (- (* index (round (om-point-h (frame-size self)) (+ numins 1))) 4) 
+                                                            :position (om-make-point
+                                                                       (- (* index (round (om-point-h (frame-size self)) (+ numins 1))) 4)
                                                                        1)
                                                             ))
                                         (inputs self)))
       (setf title (om-make-dialog-item 'om-static-text (om-make-point 5 8) (om-make-point 90 24) (name module)
-                           :font *controls-font*)) 
+                           :font *controls-font*))
      (loop for input-f in (inputframes module) do (om-add-subviews module input-f))
 
      (make-outputs-from-names self (value self) module)
-     
-     (setf (iconview module) (value self))                
+
+     (setf (iconview module) (value self))
      (om-add-subviews module (iconview module) title)
 
      (setf (frames self) (list module))
      (setf (name module) name)
      (add-box-resize module)
-     
+
      (om-set-view-size module (frame-size self))
      (update-di-size (value self) module)
-     
+
      (when (allow-lock self)
        (add-lock-button module (allow-lock self)))
-     
+
+     module))
+|#
+
+(defmethod make-frame-from-callobj ((self FLDIntbox))
+   "Make a simple frame for the editor factory 'self'."
+   (let* ((name (string-downcase (name self)))
+          (defsize (get-boxsize self))
+          (numouts (numouts self))
+          (numins (length (inputs self)))
+          (index 0)
+          (zoom (or *make-frame-zoom-context* 1.0))
+          (scale-p (and (numberp zoom) (/= zoom 1.0)))
+          (logical-pos (frame-position self))
+          (module-vpos (if (and scale-p logical-pos)
+                           (om-zoom-scale-point logical-pos zoom)
+                           logical-pos))
+          (module (om-make-view (get-frame-class self)
+                                :name (name (value self))
+                                :position module-vpos
+                                :object self))
+          title)
+
+     (unless (frame-size self)
+       (setf (frame-size self) (om-make-point
+                                (apply #'max (list (om-point-h defsize) (* 8 numouts) (* 8 numins)))
+                                (om-point-v defsize)))
+       )
+
+     (let* ((io-size-v (if scale-p (max 1 (round (* 8 zoom))) 8))
+            (io-y-v    (if scale-p (max 0 (round (* 1 zoom))) 1)))
+       (setf (inputframes module)
+             (mapcar #'(lambda (input)
+                         (setf index (+ index 1))
+                         (let* ((x-log (- (* index (round (om-point-h (frame-size self)) (+ numins 1))) 4))
+                                (x-v   (if scale-p (round (* x-log zoom)) x-log)))
+                           (om-make-view (get-input-class-frame self)
+                                         :object input
+                                         :help-spec (string+ "<" (string-downcase (name input))
+                                                             "> " (doc-string input))
+                                         :size (om-make-point io-size-v io-size-v)
+                                         :position (om-make-point x-v io-y-v))))
+                     (inputs self))))
+      (let* ((title-pos-v (if scale-p
+                              (om-make-point (max 0 (round (* 5 zoom))) (max 0 (round (* 8 zoom))))
+                              (om-make-point 5 8)))
+             (title-size-log (om-make-point 90 24))
+             (title-size-v   (if scale-p (om-zoom-scale-point title-size-log zoom) title-size-log))
+             (base-font *controls-font*)
+             (scaled-font (if scale-p (om-zoom-scale-font base-font zoom) base-font)))
+        (setf title (om-make-dialog-item 'om-static-text title-pos-v title-size-v (name module)
+                                         :font scaled-font))
+        (when scale-p
+          (setf (om-zoom-logical-font title) base-font)))
+     (setf (iconview module) (value self))
+     (om-add-subviews module (iconview module) title)
+
+     (loop for input-f in (inputframes module) do (om-add-subviews module input-f))
+     (make-outputs-from-names self (value self) module)
+
+     (setf (frames self) (list module))
+     (setf (name module) name)
+     (add-box-resize module)
+
+     (let ((logical-size (frame-size self)))
+       (when scale-p
+         (setf (om-zoom-logical-size module) logical-size))
+       (om-set-view-size module
+                         (if scale-p
+                             (om-zoom-scale-point logical-size zoom)
+                           logical-size)))
+     (update-di-size (value self) module)
+
+     (when (allow-lock self)
+       (add-lock-button module (allow-lock self)))
+
      module))
 
 (defmethod get-frame-class ((self FLDIntbox)) 'FIEditorframe)
@@ -158,11 +255,25 @@
 (defmethod allow-new-size ((self FIEditorframe) new-pos) 
    (om-make-point (max 20 (om-point-h new-pos )) (max 20 (om-point-v new-pos))))
 
+#|
 (defmethod add-lock-button ((self FIEditorframe) &optional (mode "x"))
    "Add a lock button, if the box referenced by 'self' allow it."
    (when (allow-lock-button (object self))
      (setf (lock-button self) (make-lock-button self mode))
      (om-set-view-position (lock-button self) (om-make-point 0 8))
+     (om-add-subviews self (lock-button self))
+     (om-invalidate-view self)
+     (setf (allow-lock (object self)) mode)))
+|#
+
+(defmethod add-lock-button ((self FIEditorframe) &optional (mode "x"))
+   "Add a lock button, if the box referenced by 'self' allow it."
+   (when (allow-lock-button (object self))
+     (setf (lock-button self) (make-lock-button self mode))
+     (let* ((zoom (or *make-frame-zoom-context* (om-zoom-effective self) 1.0))
+            (scale-p (and (numberp zoom) (/= zoom 1.0)))
+            (off-y   (if scale-p (round (* 8 zoom)) 8)))
+       (om-set-view-position (lock-button self) (om-make-point 0 off-y)))
      (om-add-subviews self (lock-button self))
      (om-invalidate-view self)
      (setf (allow-lock (object self)) mode)))
@@ -174,10 +285,24 @@
    (setf (lock-button self) nil)
    (setf (allow-lock (object self)) nil))
 
+#|
 (defmethod centre-icon ((self FIEditorframe))
-   (om-set-view-size 
-    (iconview self) 
+   (om-set-view-size
+    (iconview self)
     (om-subtract-points (om-view-size self) (om-make-point 0 17))))
+|#
+
+(defmethod centre-icon ((self FIEditorframe))
+   (let* ((zoom   (om-zoom-effective self))
+          (widget (iconview self)))
+     (when widget (update-di-size widget self))
+     (when widget
+       (let ((logical-font (om-zoom-logical-font widget)))
+         (when logical-font
+           (om-set-font widget
+                        (if (= zoom 1.0)
+                            logical-font
+                          (om-zoom-scale-font logical-font zoom))))))))
 
 (defmethod make-drag-region ((self FIEditorframe) region x0 y0 view)
   (declare (ignore view))
@@ -250,9 +375,25 @@
   (om-set-dialog-item-text self (format nil "~D" (car args)))
   self)
 
+#|
 (defmethod update-di-size ((self fluid-i-box) container)
   (om-set-view-position self (om-make-point 10 18))
   (om-set-view-size self (om-make-point (- (om-width container) 20) (max 20 (- (om-height container) 36)))))
+|#
+
+(defmethod update-di-size ((self fluid-i-box) container)
+  (let ((zoom (om-zoom-effective container)))
+    (om-set-view-position self
+                          (om-make-point (round (* 10 zoom)) (round (* 18 zoom))))
+    (om-set-view-size self
+                      (om-make-point (- (om-width container) (round (* 20 zoom)))
+                                     (max (round (* 20 zoom))
+                                          (- (om-height container) (round (* 36 zoom))))))
+    (let ((logical-font (om-zoom-logical-font self)))
+      (when logical-font
+        (om-set-font self (if (= zoom 1.0)
+                              logical-font
+                            (om-zoom-scale-font logical-font zoom)))))))
 
 (defmethod omng-copy ((self fluid-i-box))
   (let ((newitem (eval (omng-save self))))

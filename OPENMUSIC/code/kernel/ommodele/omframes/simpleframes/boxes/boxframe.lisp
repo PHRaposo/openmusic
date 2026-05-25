@@ -141,29 +141,41 @@
         (om-draw-line (om-point-x init-pos) (om-point-y init-pos) (om-point-x pos) (om-point-y pos))))))
 |#
 
-(defmethod draw-connection-drag ((self om-view) init-pos pos) 
-  (if (and *mag-in-out*(input? (om-find-view-containing-point self pos)))
-      (progn
-        (om-with-line-size 4
-        (om-with-line #+(or linux macosx) '(2 5) #+win32 '(1 1) 
-          (om-with-fg-color self 
-              (om-make-color-alpha 0 0 1 0.7)
-            (om-draw-line (om-point-x init-pos) (om-point-y init-pos) (om-point-x pos) (om-point-y pos)))))
-      (om-draw-picture self (om-load-icon 1550) :pos (om-make-point (- (om-point-x pos) 5) (- (om-point-y pos) 10))
-                       :size (om-make-point 12 12)))
-    (om-with-line-size 2
-        (om-with-line '(2 3) ; #+macosx '(2 3) #-macosx '(1 1)
-          (om-with-fg-color self 
-              (om-make-color-alpha 0 0 0 0.5)
-            (om-draw-line (om-point-x init-pos) (om-point-y init-pos) (om-point-x pos) (om-point-y pos)))))))
+(defmethod draw-connection-drag ((self om-view) init-pos pos)
+  (let* ((zoom    (om-zoom-effective self))
+         (thick   (max 1 (round (* 4 zoom))))
+         (thin    (max 1 (round (* 2 zoom))))
+         (icon-sz (max 1 (round (* 12 zoom))))
+         (offx    (round (* 5  zoom)))
+         (offy    (round (* 10 zoom))))
+    (if (and *mag-in-out* (input? (om-find-view-containing-point self pos)))
+        (progn
+          (om-with-line-size thick
+            (om-with-line #+(or linux macosx) '(2 5) #+win32 '(1 1)
+              (om-with-fg-color self
+                  (om-make-color-alpha 0 0 1 0.7)
+                (om-draw-line (om-point-x init-pos) (om-point-y init-pos)
+                              (om-point-x pos) (om-point-y pos)))))
+          (om-draw-picture self (om-load-icon 1550)
+                           :pos (om-make-point (- (om-point-x pos) offx)
+                                               (- (om-point-y pos) offy))
+                           :size (om-make-point icon-sz icon-sz)))
+        (om-with-line-size thin
+          (om-with-line '(2 3)
+            (om-with-fg-color self
+                (om-make-color-alpha 0 0 0 0.5)
+              (om-draw-line (om-point-x init-pos) (om-point-y init-pos)
+                            (om-point-x pos) (om-point-y pos))))))))
  
 
 (defmethod draw-auto-connection-drag ((self om-view) init-pos pos)
-    (om-with-line-size 3
-        (om-with-line '(2 3) ; #+macosx '(2 5) #-macosx '(1 1)
-          (om-with-fg-color self 
-              (om-make-color-alpha 1 0 0 0.5)
-            (om-draw-line (om-point-x init-pos) (om-point-y init-pos) (om-point-x pos) (om-point-y pos))))))
+  (let ((thick (max 1 (round (* 3 (om-zoom-effective self))))))
+    (om-with-line-size thick
+      (om-with-line '(2 3)
+        (om-with-fg-color self
+            (om-make-color-alpha 1 0 0 0.5)
+          (om-draw-line (om-point-x init-pos) (om-point-y init-pos)
+                        (om-point-x pos) (om-point-y pos)))))))
 
 
 (defmethod release-auto-connection-drag ((self outfleche) init-pos pos) 
@@ -184,23 +196,29 @@
 (defmethod om-view-mouse-enter-handler ((self outfleche))
   (when *mag-in-out*
     (setf (iconid self) 1550)
-    (let* ((pos (om-view-position self))
+    (let* ((zoom (om-zoom-effective self))
+           (big  (round (* 12 zoom)))
+           (off  (round (* 2 zoom)))
+           (pos  (om-view-position self))
            (ypos (om-point-y pos))
            (xpos (om-point-x pos)))
-      (om-set-view-size self (om-make-point 12 12))
-      (om-set-view-position self (om-make-point (- xpos 2) (+ ypos 0)))) 
-    ))
+      (om-set-view-size self (om-make-point big big))
+      (om-set-view-position self (om-make-point (- xpos off) ypos)))
+    #+win32(capi:redraw-pinboard-object self)))
 
-(defmethod om-view-mouse-leave-handler ((self outfleche)) 
+(defmethod om-view-mouse-leave-handler ((self outfleche))
   (when *mag-in-out*
     (setf (iconid self) 185)
-  (let* ((parsize (om-view-size (om-view-container self)))
-         (psizey (om-point-y parsize)))
-  (om-set-view-size self (om-make-point 8 8))
-  (om-set-view-position self (om-make-point (+ (om-point-x (om-view-position self)) 2) (- psizey 9)))
-  ;(redraw-frame (om-view-container self)) ;init all ?
-  #+win32(update-for-subviews-changes (om-view-container self) t)
-  )))
+    (let* ((zoom    (om-zoom-effective self))
+           (small   (round (* 8 zoom)))
+           (off2    (round (* 2 zoom)))
+           (off9    (round (* 9 zoom)))
+           (parsize (om-view-size (om-view-container self)))
+           (psizey  (om-point-y parsize)))
+      (om-set-view-size self (om-make-point small small))
+      (om-set-view-position self (om-make-point (+ (om-point-x (om-view-position self)) off2)
+                                                (- psizey off9))))
+    #+win32(capi:redraw-pinboard-object self)))
 
 
 ;--------------CONNECTION
@@ -432,6 +450,7 @@
    ))
 
 ;;; CARRE GRIS TOUT AUTOUR
+#|
 (defmethod draw-before-box ((self omboxframe))
   (when (frame-size (object self))
     (om-with-focused-view self
@@ -444,6 +463,25 @@
     (om-with-focused-view self
       (om-with-fg-color nil (om-make-color .821 0.821 0.821)
         (om-fill-rect 0 8 (w self) (- (h self) 17))))))
+|#
+
+(defmethod draw-before-box ((self omboxframe))
+  (when (frame-size (object self))
+    (let* ((zoom (om-zoom-effective self))
+           (top  (round (* 8 zoom)))
+           (bot  (round (* 17 zoom))))
+      (om-with-focused-view self
+        (om-with-fg-color nil (om-make-color 0.921 0.921 0.921)
+          (om-fill-rect 0 top (w self) (- (h self) bot)))))))
+
+(defmethod draw-selected-box ((self omboxframe))
+  (when (frame-size (object self))
+    (let* ((zoom (om-zoom-effective self))
+           (top  (round (* 8 zoom)))
+           (bot  (round (* 17 zoom))))
+      (om-with-focused-view self
+        (om-with-fg-color nil (om-make-color .821 0.821 0.821)
+          (om-fill-rect 0 top (w self) (- (h self) bot)))))))
     
 (defmethod draw-after-box ((self omboxframe)) nil)
 
@@ -484,8 +522,21 @@
    (toggle-icon-active-mode self))
 
 
+(defvar *om-zoom-drag-visual-pos* nil
+  "When bound, pins CAPI to the exact dragged pixel and skips
+LOGICAL->VISUAL recompute (avoids double-round drift).")
+
+(defmethod om-set-view-position ((self omboxframe) pos)
+  (let* ((zoom (om-zoom-effective self))
+         (capi-pos (or *om-zoom-drag-visual-pos*
+                       (if (= zoom 1.0) pos (om-zoom-scale-point pos zoom)))))
+    (when (object self)
+      (setf (frame-position (object self)) pos))
+    (call-next-method self capi-pos)))
+
 ;;; bizarre : on doit mettre les size des in/outs et lock button a la main sinon ils sont modifies.
 ;;; aussi pour les "lisp" icon...
+#|
 (defmethod om-set-view-size ((self omboxframe) size)
   (let* ((w (om-point-x size))
          (h (om-point-y size))
@@ -493,11 +544,11 @@
          (ins (copy-list (inputframes self)))
          (outputs (sort outs  '< :key 'index))
          (numouts (length outputs))
-         (numins (length ins)) 
+         (numins (length ins))
          (i 0))
     (loop for out in outputs do
           (setf i (+ i 1))
-          (om-set-view-position out (om-make-point (- (* i (round w (+ numouts 1))) 4) 
+          (om-set-view-position out (om-make-point (- (* i (round w (+ numouts 1))) 4)
                                                    (- h 9)))
           (om-set-view-size out (om-make-point 8 8)))
     (setf i 0)
@@ -505,15 +556,84 @@
            (setf i (+ i 1))
            (om-set-view-position in (om-make-point (- (* i  (round w (+ numins 1))) 4) 1))
            (om-set-view-size in (om-make-point 8 8)))
-    
+
     (setf (frame-size (object self)) size)
     (when (lock-button self) (om-set-view-size (lock-button self) (om-make-point 10 10)))
     (when (resize-box self) (om-set-view-position (resize-box self) (om-make-point (- w 10) (- h 10))))
     )
   (call-next-method)
   (centre-icon self))
+|#
+
+(defvar *om-zoom-internal-resize* nil
+  "When T, om-set-view-size skips the frame-size setf so a zoom relayout
+does not mark the box as user-resized.")
+
+(defmethod om-set-view-size ((self omboxframe) size)
+  (let* ((zoom (om-zoom-effective self))
+         (visual (if (= zoom 1.0) size (om-zoom-scale-point size zoom)))
+         (w (om-point-x visual))
+         (h (om-point-y visual))
+         (outs (copy-list (outframes self)))
+         (ins  (copy-list (inputframes self)))
+         (outputs (sort outs '< :key 'index))
+         (numouts (length outputs))
+         (numins  (length ins))
+         (io-size     (max 1 (round (* 8 zoom))))
+         (io-offset   (round (* 4 zoom)))
+         (top-off     (max 0 (round (* 1 zoom))))
+         (bottom-off  (round (* 9 zoom)))
+         (lock-size   (max 1 (round (* 10 zoom))))
+         (resize-marg (round (* 10 zoom)))
+         (i 0))
+    (loop for out in outputs do
+          (setf i (+ i 1))
+          (om-set-view-position out (om-make-point (- (* i (round w (+ numouts 1))) io-offset)
+                                                   (- h bottom-off)))
+          (om-set-view-size out (om-make-point io-size io-size)))
+    (setf i 0)
+    (loop for in in ins do
+          (setf i (+ i 1))
+          (om-set-view-position in (om-make-point (- (* i (round w (+ numins 1))) io-offset)
+                                                  top-off))
+          (om-set-view-size in (om-make-point io-size io-size)))
+    (when (and (object self) (not *om-zoom-internal-resize*))
+      (setf (frame-size (object self)) size))
+    (when (lock-button self)
+      (om-set-view-size (lock-button self) (om-make-point lock-size lock-size)))
+    (when (resize-box self)
+      (om-set-view-position (resize-box self)
+                            (om-make-point (- w resize-marg) (- h resize-marg)))
+      (om-set-view-size (resize-box self) (om-make-point lock-size lock-size)))
+    (call-next-method self visual))
+  (centre-icon self))
+
+(defmethod om-zoom-redraw-connections ((frame omboxframe))
+  (redraw-connections frame))
+
+(defmethod om-zoom-relayout-frame ((frame omboxframe))
+  (om-zoom-capture-logical-geom frame)
+  (let* ((obj (object frame))
+         (logical-pos  (or (and obj (frame-position obj))
+                           (om-zoom-logical-pos  frame)))
+         (logical-size (or (and obj (frame-size obj))
+                           (om-zoom-logical-size frame))))
+    (when logical-pos
+      (om-set-view-position frame logical-pos))
+    (if logical-size
+        (let ((*om-zoom-internal-resize* t))
+          (om-set-view-size frame logical-size))
+        (centre-icon frame))
+    (let ((iv (iconview frame)))
+      (when (and iv (typep iv 'general-miniview) obj
+                 (and (slot-exists-p iv 'minipict)
+                      (handler-case (minipict iv)
+                        (error (c) (om-zoom-log-error :relayout-minipict-access c) nil))))
+        (handler-case (update-miniview iv (value obj))
+          (error (c) (om-zoom-log-error :relayout-refresh-minipict c)))))))
 
 
+#|
 (defmethod add-box-resize ((self omboxframe))
    "add a resize view to the wiew 'self'"
    (om-add-subviews self
@@ -522,6 +642,20 @@
                          ;:bg-color (om-make-color-alpha 0.8 0.8 0.8 0.2)
                          :size (om-make-point 10 10)
                          :position (om-make-point (- (w self) 10) (- (h self) 10))))))
+|#
+
+(defmethod add-box-resize ((self omboxframe))
+  "add a resize view to the wiew 'self'"
+  (let* ((zoom (or *make-frame-zoom-context* 1.0))
+         (scale-p (and (numberp zoom) (/= zoom 1.0)))
+         (size-v (if scale-p (max 1 (round (* 10 zoom))) 10))
+         (off-v  size-v))
+    (om-add-subviews self
+      (setf (resize-box self)
+            (om-make-view 'c-resize-box
+                          ;:bg-color (om-make-color-alpha 0.8 0.8 0.8 0.2)
+                          :size (om-make-point size-v size-v)
+                          :position (om-make-point (- (w self) off-v) (- (h self) off-v)))))))
 
 
 ;---------------EVENTS
@@ -532,6 +666,7 @@
    "Called when you close the patch containing self."
    (setf (frames (object self)) nil))
 
+#|
 (defmethod redraw-frame ((self omboxframe))
    "Update graphically 'self'."
    (let ((thescroll (om-view-container self))
@@ -543,6 +678,21 @@
        (update-graphic-connections frame (get-elements (object thescroll)))
        (make-move-after thescroll (list frame))
        frame)))
+|#
+
+(defmethod redraw-frame ((self omboxframe))
+  "Update graphically 'self'."
+  (let ((thescroll (om-view-container self))
+        (object (object self)) frame)
+    (when thescroll
+      (om-remove-subviews thescroll self)
+      (let ((*make-frame-zoom-context*
+             (and (typep thescroll 'om-scroller) (om-zoom-of thescroll))))
+        (setf frame (make-frame-from-callobj object)))
+      (om-add-subviews thescroll frame)
+      (update-graphic-connections frame (get-elements (object thescroll)))
+      (make-move-after thescroll (list frame))
+      frame)))
 
 (defmethod update-graphic-connections ((self omboxframe) boxes)
    (let ((i 0) rep exist?)
@@ -566,6 +716,7 @@
     (setf (connected? (object ctrl)) nil)
     (modify-patch (om-view-container self))))
 
+#|
 (defmethod OMGMoveObject ((self omboxframe) new-position)
    "Move 'self' to 'new-position'."
    ;(mapc #'(lambda (conection)
@@ -584,6 +735,27 @@
        (1 (omGMoveObject self (om-add-points (om-view-position self) (om-make-point 0 pixnum))))
        (2 (omGMoveObject self (om-add-points (om-view-position self) (om-make-point pixnum 0))))
        (3 (omGMoveObject self (om-subtract-points (om-view-position self) (om-make-point pixnum 0)))))))
+|#
+
+(defmethod OMGMoveObject ((self omboxframe) new-position)
+   "Move SELF to NEW-POSITION (LOGICAL). om-set-view-position stores
+    frame-position canonically."
+   ;(mapc #'(lambda (conection)
+   ;          (draw-connection conection nil)) (connections self))
+   (setf new-position (borne-position new-position))
+   (om-set-view-position self new-position)
+   (om-highlight-view self nil))
+
+(defmethod move-frame-delta ((self omboxframe) dir)
+   "Move self by 1 or 10 logical units left/right/up/down."
+   (let* ((pixnum (if (om-shift-key-p) 10 1))
+          (pos    (or (and (object self) (frame-position (object self)))
+                      (om-view-position self))))
+     (case dir
+       (0 (omGMoveObject self (om-subtract-points pos (om-make-point 0 pixnum))))
+       (1 (omGMoveObject self (om-add-points      pos (om-make-point 0 pixnum))))
+       (2 (omGMoveObject self (om-add-points      pos (om-make-point pixnum 0))))
+       (3 (omGMoveObject self (om-subtract-points pos (om-make-point pixnum 0)))))))
 
 (defmethod reinit-size ((box omboxframe))
    "Set the size of self to the initial size."
@@ -593,6 +765,7 @@
      (omG-select (redraw-frame box))   
      ;(setf (frame-size (object box)) (om-view-size box))
      ))
+#|
 (defmethod box-resize-x-plus  ((box omboxframe))
   "Enlarge box horizontally with increment of 10pt."
   (let* ((size (om-view-size box))
@@ -606,7 +779,7 @@
          (x (om-point-h size))
          (y (om-point-v size)))
     (if (>= x 40);30
-        (change-boxframe-size box (om-make-point (- x 10) y)) 
+        (change-boxframe-size box (om-make-point (- x 10) y))
       (om-beep-msg "Minimum size reached!"))))
 
 (defmethod box-resize-y-plus ((box omboxframe))
@@ -616,7 +789,7 @@
            (y (om-point-v size)))
 (change-boxframe-size box (om-make-point x (+ y 10)))))
 
-(defmethod box-resize-y-minus ((box omboxframe)) 
+(defmethod box-resize-y-minus ((box omboxframe))
   "Decrease size of self vertically."
   (let* ((size (om-view-size box))
          (x (om-point-h size))
@@ -625,6 +798,47 @@
          (change-boxframe-size box (om-make-point x (- y 10)))
       (om-beep-msg "Minimum size reached!"))
      ))
+|#
+
+(defun box-logical-size (box)
+  (let ((obj (object box)))
+    (or (and obj (frame-size obj))
+        (let ((z (om-zoom-effective box)))
+          (if (= z 1.0)
+              (om-view-size box)
+              (om-zoom-unscale-point (om-view-size box) z))))))
+
+(defmethod box-resize-x-plus  ((box omboxframe))
+  "Enlarge box horizontally with increment of 10pt."
+  (let* ((size (box-logical-size box))
+         (x (om-point-h size))
+         (y (om-point-v size)))
+    (change-boxframe-size box (om-make-point (+ x 10) y))))
+
+(defmethod box-resize-x-minus ((box omboxframe))
+  "Decrease size of self horizontally."
+  (let* ((size (box-logical-size box))
+         (x (om-point-h size))
+         (y (om-point-v size)))
+    (if (>= x 40)
+        (change-boxframe-size box (om-make-point (- x 10) y))
+      (om-beep-msg "Minimum size reached!"))))
+
+(defmethod box-resize-y-plus ((box omboxframe))
+  "Enlarge box vertically with increment of 10pt."
+  (let* ((size (box-logical-size box))
+         (x (om-point-h size))
+         (y (om-point-v size)))
+    (change-boxframe-size box (om-make-point x (+ y 10)))))
+
+(defmethod box-resize-y-minus ((box omboxframe))
+  "Decrease size of self vertically."
+  (let* ((size (box-logical-size box))
+         (x (om-point-h size))
+         (y (om-point-v size)))
+    (if (>= y 60)
+        (change-boxframe-size box (om-make-point x (- y 10)))
+      (om-beep-msg "Minimum size reached!"))))
 
 
 (defmethod reinit-contents ((box omboxframe))
@@ -769,20 +983,66 @@
    (om-invalidate-view self))
 
 
+#|
 (defmethod centre-icon ((self omboxframe))
    (let ((nameview (nameView self)))
-     (om-set-view-position (iconview self) 
+     (om-set-view-position (iconview self)
                         (om-make-point (- (round (w self) 2) (round (om-point-h (om-view-size (iconview self))) 2)) 10))
      (when nameview
        (om-set-view-position nameview
                              (om-make-point (- (round (w self) 2) (round (om-point-h (om-view-size nameview)) 2))
                                             (- (h self) 10 (h nameview)))))))
-     
-  
+
 
 (defmethod allow-new-size ((self omboxframe) new-pos)
    (when (> (om-point-h new-pos) 10)
      (om-make-point (om-point-h new-pos) (om-point-v (om-view-size self)))))
+|#
+
+(defmethod centre-icon ((self omboxframe))
+  (let* ((zoom     (om-zoom-effective self))
+         (off      (round (* 10 zoom)))
+         (iconview (iconview self))
+         (nameview (nameView self))
+         (obj      (object self)))
+    (when iconview
+      (let* ((logical-iconsize (and obj (icon-sizes (icon obj) (def-icon-size obj))))
+             (iv-w (if logical-iconsize
+                       (max 1 (round (* (first  logical-iconsize) zoom)))
+                     (om-point-h (om-view-size iconview))))
+             (iv-h (if logical-iconsize
+                       (max 1 (round (* (second logical-iconsize) zoom)))
+                     (om-point-v (om-view-size iconview)))))
+        (when logical-iconsize
+          (om-set-view-size iconview (om-make-point iv-w iv-h)))
+        (om-set-view-position iconview
+                              (om-make-point (- (round (w self) 2) (round iv-w 2))
+                                             off))))
+    (when nameview
+      (om-zoom-capture-logical-font nameview)
+      (let* ((logical-font (or (om-zoom-logical-font nameview) *ombox-font*))
+             (scaled-font  (if (= zoom 1.0)
+                               logical-font
+                             (om-zoom-scale-font logical-font zoom)))
+             (name (and obj (or (frame-name obj) (get-frame-name obj))))
+             (name-w (if name (round (get-name-size name scaled-font)) 0))
+             (name-h (if name (+ 3 (max 1 (om-string-h scaled-font))) 0)))
+        (om-set-font nameview scaled-font)
+        (when (and (> name-w 0) (> name-h 0))
+          (om-set-view-size nameview (om-make-point name-w name-h)))
+        (when iconview
+          (let ((icon-bottom (+ (om-point-v (om-view-position iconview))
+                                (om-point-v (om-view-size iconview)))))
+            (om-set-view-position nameview
+                                  (om-make-point (- (round (w self) 2)
+                                                    (round (om-point-h (om-view-size nameview)) 2))
+                                                 (- icon-bottom 1)))))))))
+
+
+(defmethod allow-new-size ((self omboxframe) new-pos)
+   (when (> (om-point-h new-pos) 10)
+     (om-make-point (om-point-h new-pos)
+                    (om-point-v (box-logical-size self)))))
 
 (defmethod change-boxframe-size ((view omboxframe) new-position)
     (when (setf new-position (allow-new-size view new-position))
@@ -860,6 +1120,7 @@
 
 (defmethod allowed-lock-modes ((self omboxcall)) '("x" "&" "l" "o"))
 
+#|
 (defmethod make-lock-button ((self omboxframe) mode)
   (om-make-view 'lock-button
                 :IconID (get-icon-lock mode)
@@ -873,6 +1134,23 @@
                               (setf (allow-lock (object self)) newmode)
                               (om-invalidate-view self)
                               ))))
+|#
+
+(defmethod make-lock-button ((self omboxframe) mode)
+  (let* ((zoom (or *make-frame-zoom-context* (om-zoom-effective self) 1.0))
+         (scale-p (and (numberp zoom) (/= zoom 1.0)))
+         (size-v (if scale-p (max 1 (round (* 10 zoom))) 10)))
+    (om-make-view 'lock-button
+                  :IconID (get-icon-lock mode)
+                  :size (om-make-point size-v size-v)
+                  :position (om-make-point 0 0) ;;; (x (iconview self)) 8)
+                  :action #'(lambda (item)
+                              (let* ((modes (allowed-lock-modes (object self)))
+                                     (mpos (position (mode item) modes :test 'string-equal))
+                                     (newmode (when mpos (nth (mod (1+ mpos) (length modes)) modes))))
+                                (setf (mode item) newmode (iconID item) (get-icon-lock newmode))
+                                (setf (allow-lock (object self)) newmode)
+                                (om-invalidate-view self))))))
   
 (defmethod add-lock-button ((self omboxframe) &optional (mode "x"))
    "Add a lock button, ff the box referenced by 'self' allow it."
@@ -956,6 +1234,7 @@
    (:documentation "Simple frame for boxes that allow the lock button only in ev-once mode.#enddoc#
 #seealso# (OMBoxCall lock-button) #seealso#"))
 
+#|
 (defmethod add-lock-button ((self ev-onceboxframe) &optional (mode "&"))
   "Allow only lock button in mode ev-once."
   (declare (ignore icon))
@@ -967,6 +1246,25 @@
                                             :owner (iconview self)    ;;; self
                                             :action #'(lambda (item)
                                                         (declare (ignore item)) (om-beep))))
+    (om-invalidate-view self)
+    (setf (allow-lock (object self)) "&")))
+|#
+
+(defmethod add-lock-button ((self ev-onceboxframe) &optional (mode "&"))
+  "Allow only lock button in mode ev-once."
+  (declare (ignore icon))
+  (when (allow-lock-button (object self))
+    (let* ((zoom    (or *make-frame-zoom-context* (om-zoom-effective self) 1.0))
+           (scale-p (and (numberp zoom) (/= zoom 1.0)))
+           (size-v  (if scale-p (max 1 (round (* 10 zoom))) 10))
+           (off-y   (if scale-p (round (* 8 zoom)) 8)))
+      (setf (lock-button self)  (om-make-view 'lock-button
+                                              :IconID (get-icon-lock mode)
+                                              :size (om-make-point size-v size-v)
+                                              :position (om-make-point (x (iconview self)) off-y)
+                                              :owner (iconview self)    ;;; self
+                                              :action #'(lambda (item)
+                                                          (declare (ignore item)) (om-beep)))))
     (om-invalidate-view self)
     (setf (allow-lock (object self)) "&")))
 
@@ -1002,6 +1300,7 @@
    (when (and (> (om-point-h new-pos) 10) (> (om-point-v new-pos) 0))
      (om-make-point (om-point-h new-pos) (max 20 (om-point-v new-pos)))))
 
+#|
 (defmethod centre-icon ((self boxTypeFrame))
   (om-set-view-size (iconview self) (om-make-point (- (w self) 2) (- (h self) 11))))
 
@@ -1019,9 +1318,41 @@
    (let ((goodsize (good-text-box-size (om-dialog-item-text (iconview box)) (om-get-font (iconview box)))))
      (setf (frame-size (object box)) goodsize)
      (box-draw-connections box nil)
-     (omG-select (redraw-frame box))   
+     (omG-select (redraw-frame box))
      ;(setf (frame-size (object box)) (om-view-size box))
      ))
+|#
+
+(defmethod centre-icon ((self boxTypeFrame))
+  (let* ((zoom (om-zoom-effective self))
+         (mx   (round (* 2 zoom)))
+         (my   (round (* 11 zoom)))
+         (iv   (iconview self)))
+    (when iv
+      (om-set-view-size iv (om-make-point (- (w self) mx) (- (h self) my)))
+      (let ((scaled (if (= zoom 1.0)
+                        *ombox-font*
+                      (om-zoom-scale-font *ombox-font* zoom))))
+        (handler-case (om-set-font iv scaled)
+          (error (c) (om-zoom-log-error :centre-icon-boxtype-font c)))))))
+
+(defmethod draw-after-box ((self boxtypeframe))
+   (let* ((zoom   (om-zoom-effective self))
+          (deltay (round (* (if (zerop (numouts (object self))) 1 9) zoom)))
+          (off1   (round (* 1 zoom)))
+          (pen    (max 1 (round (* 1 zoom)))))
+     (om-with-focused-view self
+       (om-draw-rect 0 0 (- (w self) off1) (- (h self) off1 deltay) :pensize pen))
+     t))
+
+
+
+(defmethod reinit-size ((box boxtypeframe))
+   "Set the size of self to the initial size."
+   (let ((goodsize (good-text-box-size (om-dialog-item-text (iconview box)) *ombox-font*)))
+     (setf (frame-size (object box)) goodsize)
+     (box-draw-connections box nil)
+     (omG-select (redraw-frame box))))
 
 ;;; test : pour eviter d'ouvrir un editeur quand on clique juste au bord d'un undefined par ex.
 ;;; new : rajoute callnextmethod
@@ -1042,15 +1373,29 @@
 
 
 ;Draw a special pattern for alias boxes.
+#|
 (defmethod draw-after-box ((self aliasBoxframe))
    (let ((view (iconView self)))
      (om-with-focused-view self
-       (om-with-dashline 
+       (om-with-dashline
          (om-with-line-size 1.5
            (om-with-fg-color view *om-gray-color*
              (let ((r (om-make-rect (x view) (y view) (+ (x view) (w view)) (+ (y view) (h view)))))
                (om-draw-rect 2 2 (- (w self) 4) (- (h self) 4))
                )))))))
+|#
+
+(defmethod draw-after-box ((self aliasBoxframe))
+   (let* ((zoom (om-zoom-effective self))
+          (view (iconView self))
+          (off2 (round (* 2 zoom)))
+          (off4 (round (* 4 zoom)))
+          (pen  (max 1 (* 1.5 zoom))))
+     (om-with-focused-view self
+       (om-with-dashline
+         (om-with-line-size pen
+           (om-with-fg-color view *om-gray-color*
+             (om-draw-rect off2 off2 (- (w self) off4) (- (h self) off4))))))))
 
 ;--------------------------------------
 
@@ -1075,14 +1420,26 @@
   (call-next-method))
 ;;  (om-set-part-color (nameview self) :body *instboxframe-color*))
 
+#|
 (defmethod draw-before-box ((self instBoxframe))
    (call-next-method)
    (om-draw-picture self (if (mypathname (reference (object self)))
                                                     *glass-pict-per* *glass-pict*)
-                                    ;(om-make-point (- (x (iconview self)) 5) (y (iconview self))) 
+                                    ;(om-make-point (- (x (iconview self)) 5) (y (iconview self)))
                                     ;(om-make-point (+ (w (iconview self)) 5) (- (h self) 19))
                     :size (om-subtract-points (om-view-size self) (om-make-point 0 11))
                     )
+|#
+
+(defmethod draw-before-box ((self instBoxframe))
+   (call-next-method)
+   (let* ((zoom (om-zoom-effective self))
+          (off  (round (* 11 zoom))))
+     (om-draw-picture self (if (mypathname (reference (object self)))
+                               *glass-pict-per* *glass-pict*)
+                      ;(om-make-point (- (x (iconview self)) 5) (y (iconview self)))
+                      ;(om-make-point (+ (w (iconview self)) 5) (- (h self) 19))
+                      :size (om-subtract-points (om-view-size self) (om-make-point 0 off))))
    ;(om-draw-view-outline (nameview self))
    ;(om-with-fg-color self *instboxframe-color*
      ;(om-fill-rect (x (nameview self)) 0 (w (nameview self)) (- (h self) 18))
@@ -1253,8 +1610,24 @@
    (when (and (> (om-point-h new-pos) 10) (> (om-point-v new-pos) 5))
      new-pos))
 
+#|
 (defmethod centre-icon ((self commentboxframe))
    (om-set-view-size (iconview self) (om-subtract-points (om-view-size self) (om-make-point 6 6))))
+|#
+
+(defmethod centre-icon ((self commentboxframe))
+  (let* ((zoom (om-zoom-effective self))
+         (m    (round (* 6 zoom)))
+         (iv   (iconview self))
+         (obj  (object self)))
+    (when iv
+      (om-set-view-size iv (om-subtract-points (om-view-size self) (om-make-point m m)))
+      (when (and obj (slot-exists-p obj 'textstyle) (textstyle obj))
+        (let ((scaled (if (= zoom 1.0)
+                          (textstyle obj)
+                        (om-zoom-scale-font (textstyle obj) zoom))))
+          (handler-case (om-set-font iv scaled)
+            (error (c) (om-zoom-log-error :centre-icon-commentbox-font c))))))))
 
 ;--------EVENTS
 (defmethod draw-before-box ((self commentboxframe)) t)
@@ -1406,10 +1779,11 @@
   (setf (show-name (object self)) (not (show-name (object self))))
   (om-invalidate-view self))
         
+#|
 (defmethod move-frame-delta ((self boxEditorFrame) dir)
    "If option-key is down move the pict in the self's miniview and not 'self'."
    (if (om-option-key-p)
-     (move-miniview (iconview self) dir) 
+     (move-miniview (iconview self) dir)
      (let ((pixnum (if (om-shift-key-p) 10 1)) new-position)
        (setf new-position
              (borne-position (case dir
@@ -1422,8 +1796,29 @@
        ;          (draw-connection conection nil)) (connections self))
        (om-set-view-position self new-position)
        (setf (frame-position (object self)) new-position))))
+|#
+
+(defmethod move-frame-delta ((self boxEditorFrame) dir)
+   "If option-key is down move the pict in the self's miniview and not 'self'."
+   (if (om-option-key-p)
+     (move-miniview (iconview self) dir)
+     (let* ((pixnum (if (om-shift-key-p) 10 1))
+            (pos (or (and (object self) (frame-position (object self)))
+                     (om-view-position self)))
+            (new-position
+             (borne-position (case dir
+               (0 (om-subtract-points pos (om-make-point 0 pixnum)))
+               (1 (om-add-points      pos (om-make-point 0 pixnum)))
+               (2 (om-add-points      pos (om-make-point pixnum 0)))
+               (3 (om-subtract-points pos (om-make-point pixnum 0)))))))
+       ; pas la peine ?
+       ;(mapc #'(lambda (conection)
+       ;          (draw-connection conection nil)) (connections self))
+       (om-set-view-position self new-position)
+       (setf (frame-position (object self)) new-position))))
 
 
+#|
 (defmethod change-boxframe-size ((view boxEditorFrame) new-size)
    (when (setf new-position (allow-new-size view new-size))
        (om-set-view-size view new-position)
@@ -1432,6 +1827,16 @@
          (update-miniview (iconview view) (value (object view))))
        (om-invalidate-view view)
        ))
+|#
+
+(defmethod change-boxframe-size ((view boxEditorFrame) new-size)
+   "NEW-SIZE is LOGICAL."
+   (when (setf new-size (allow-new-size view new-size))
+     (om-set-view-size view new-size)
+     (make-move-after (om-view-container view) (list view))
+     (when (showpict (object view))
+       (update-miniview (iconview view) (value (object view))))
+     (om-invalidate-view view)))
 
 (defmethod reinit-size ((self boxEditorFrame)) 
    (when (get-edit-param (object self) 'deltapict)
@@ -1464,16 +1869,42 @@
 (defmethod allow-new-size ((self boxEditorFrame) new-pos) 
    (om-make-point (max 30 (om-point-h new-pos )) (max 30 (om-point-v new-pos ))))
 
+#|
 (defmethod centre-icon ((self boxEditorFrame))
-   (om-set-view-size (iconview self) 
-                  (om-subtract-points (om-view-size self) 
+   (om-set-view-size (iconview self)
+                  (om-subtract-points (om-view-size self)
                                       (if (minieditor? (object self)) (om-make-point 4 21) (om-make-point 0 17)))))
+|#
 
+(defmethod centre-icon ((self boxEditorFrame))
+   (let* ((zoom (om-zoom-effective self))
+          (mini? (minieditor? (object self)))
+          (mx    (if mini? (round (* 4 zoom)) 0))
+          (my    (if mini? (round (* 21 zoom)) (round (* 17 zoom))))
+          (pos-x (if mini? (round (* 2 zoom)) 0))
+          (pos-y (round (* 8 zoom)))
+          (iv    (iconview self)))
+     (when iv
+       (om-set-view-size iv
+                         (om-subtract-points (om-view-size self) (om-make-point mx my)))
+       (om-set-view-position iv (om-make-point pos-x pos-y)))))
+
+#|
 (defmethod make-drag-region ((self boxEditorFrame) region x0 y0 view)
   (declare (ignore view))
   (let* ((x (- (x self) x0))
          (y (- (y self) y0)))
     (om-set-rect-region region x y  (+ x (w self)) (- (+ y (h self)) 16)))
+   region)
+|#
+
+(defmethod make-drag-region ((self boxEditorFrame) region x0 y0 view)
+  (declare (ignore view))
+  (let* ((zoom (om-zoom-effective self))
+         (off  (round (* 16 zoom)))
+         (x    (- (x self) x0))
+         (y    (- (y self) y0)))
+    (om-set-rect-region region x y (+ x (w self)) (- (+ y (h self)) off)))
    region)
 
 (defmethod draw-before-box ((self boxEditorFrame))  nil)
@@ -1495,6 +1926,7 @@
        (setf (minipict (iconview box)) nil)))
    (setf (frames (object box)) nil))
 
+#|
 (defmethod OMGMoveObject ((self boxEditorFrame) new-position)
    "If shift-key is down when drag self it do not move but it create and slot box."
    (if (or (om-shift-key-p) (shift-key-p *OM-drag&drop-handler*))
@@ -1502,6 +1934,19 @@
        (when target
          (setf newobj (omNG-make-new-boxcall-slots (reference (object self))  (borne-position new-position) (mk-unique-name target "slot")))
          (omG-add-element target (make-frame-from-callobj newobj))))
+     (call-next-method)))
+|#
+
+(defmethod OMGMoveObject ((self boxEditorFrame) new-position)
+   "If shift-key is down when drag self it do not move but it create and slot box."
+   (if (or (om-shift-key-p) (shift-key-p *OM-drag&drop-handler*))
+     (let* ((target (om-view-container self)) newobj)
+       (when target
+         (setf newobj (omNG-make-new-boxcall-slots (reference (object self))  (borne-position new-position) (mk-unique-name target "slot")))
+         (omG-add-element target
+                          (let ((*make-frame-zoom-context*
+                                 (and (typep target 'om-scroller) (om-zoom-of target))))
+                            (make-frame-from-callobj newobj)))))
      (call-next-method)))
 
 
@@ -1610,9 +2055,10 @@
 
 (defmethod allowed-lock-modes ((self omboxmaquette)) '("x" "&" "o"))
 
+#|
 (defmethod add-lock-button ((self maquetteframe) &optional (mode "x"))
   "Not lambda mode for maquette boxes."
-  (when (and (allow-lock-button (object self)) 
+  (when (and (allow-lock-button (object self))
              (find mode (allowed-lock-modes (object self)) :test 'string-equal))
     (setf (lock-button self)  (om-make-view 'lock-button
                                             :IconID (get-icon-lock mode)
@@ -1628,6 +2074,31 @@
                                                           (setf (allow-lock (object self)) newmode)
                                                           ;#+(or linux win32)(om-draw-contents item)
                                                           ))))
+    (om-invalidate-view self)
+    (setf (allow-lock (object self)) mode)))
+|#
+
+(defmethod add-lock-button ((self maquetteframe) &optional (mode "x"))
+  "Not lambda mode for maquette boxes."
+  (when (and (allow-lock-button (object self))
+             (find mode (allowed-lock-modes (object self)) :test 'string-equal))
+    (let* ((zoom    (or *make-frame-zoom-context* (om-zoom-effective self) 1.0))
+           (scale-p (and (numberp zoom) (/= zoom 1.0)))
+           (size-v  (if scale-p (max 1 (round (* 10 zoom))) 10)))
+      (setf (lock-button self)  (om-make-view 'lock-button
+                                              :IconID (get-icon-lock mode)
+                                              :size (om-make-point size-v size-v)
+                                              :position (om-make-point 0 0) ;;;(om-make-point (x (iconview self)) 8)
+                                              :owner (iconview self)   ;;; self
+                                              :action #'(lambda (item)
+                                                          (let* ((modes (allowed-lock-modes (object self)))
+                                                                 (mpos (position (mode item) modes :test 'string-equal))
+                                                                 (newmode (nth (mod (1+ mpos) (length modes)) modes)))
+                                                            (setf (mode item) newmode
+                                                                  (iconID item) (get-icon-lock newmode))
+                                                            (setf (allow-lock (object self)) newmode)
+                                                            ;#+(or linux win32)(om-draw-contents item)
+                                                            )))))
     (om-invalidate-view self)
     (setf (allow-lock (object self)) mode)))
 
@@ -1647,8 +2118,9 @@
 
 ;----------------------------------------
 
+#|
 (defmethod make-graph-instance ((self t) container posi box)
-   (cond 
+   (cond
     ((omclass-p (class-of (class-of self)))
      (let ((theclass (class-of self)))
        (let* ((instance (omNG-make-new-instance (clone self) (mk-unique-name container (name theclass))))
@@ -1664,6 +2136,30 @@
      (let* ((instance (omNG-make-new-instance (clone self) (mk-unique-name container (if (null self) "nil" "list"))))
             (obj (omNG-make-new-boxcall instance posi (name instance)))
             (frame (make-frame-from-callobj obj)))
+       (omG-add-element container frame)))))
+|#
+
+(defmethod make-graph-instance ((self t) container posi box)
+   (cond
+    ((omclass-p (class-of (class-of self)))
+     (let ((theclass (class-of self)))
+       (let* ((instance (omNG-make-new-instance (clone self) (mk-unique-name container (name theclass))))
+              (obj (omNG-make-new-boxcall instance posi (name instance)))
+              (frame (let ((*make-frame-zoom-context*
+                            (and (typep container 'om-scroller) (om-zoom-of container))))
+                       (make-frame-from-callobj obj))))
+          ;; attention l'instance n'est pas forcement du meme type que celle de la boite d'ou elle sort...
+          (if  (and  (edition-params (object box))
+                    (equal (type-of (value (object box))) (type-of (instance instance))))
+              (setf (edition-params instance) (eval (copy-value-params self (object box))))
+            (setf (edition-params instance) (default-edition-params (instance instance))))
+         (omG-add-element container frame))))
+    ((listp self)
+     (let* ((instance (omNG-make-new-instance (clone self) (mk-unique-name container (if (null self) "nil" "list"))))
+            (obj (omNG-make-new-boxcall instance posi (name instance)))
+            (frame (let ((*make-frame-zoom-context*
+                          (and (typep container 'om-scroller) (om-zoom-of container))))
+                     (make-frame-from-callobj obj))))
        (omG-add-element container frame)))))
 
 
@@ -1718,11 +2214,23 @@
   (call-next-method)
   (set-icon-pos (find-class (reference (object self))) (borne-position new-position)))
 
+#|
 (defmethod redraw-frame ((self classboxFrame))
   (let ((thescroll (om-view-container self))
         (object (object self)) frame)
     (om-remove-subviews thescroll self)
     (setf frame (make-frame-from-callobj object))
+    (om-add-subviews thescroll frame)
+    (update-graphic-connections frame (get-class+alias (object thescroll)))))
+|#
+
+(defmethod redraw-frame ((self classboxFrame))
+  (let ((thescroll (om-view-container self))
+        (object (object self)) frame)
+    (om-remove-subviews thescroll self)
+    (let ((*make-frame-zoom-context*
+           (and (typep thescroll 'om-scroller) (om-zoom-of thescroll))))
+      (setf frame (make-frame-from-callobj object)))
     (om-add-subviews thescroll frame)
     (update-graphic-connections frame (get-class+alias (object thescroll)))))
 
@@ -1738,7 +2246,18 @@
 ;------------------------------------------------------------------
 ;------------------------------------------------------------------
 (defvar *function-without-name* (list 'om+ 'om* 'om- 'om/ 'om^ 'omand 'omor 'om-e 'om-log 'om< 'om> 'om<= 'om>= 'om= 'om/=)
-   "This list contains the name of generic functions that do not show their name in the box.")
+   "Built-in list of function names whose boxes render only the icon (no name strip).
+    Kept as the default source for FUNCTION-WITHOUT-NAME-P; libraries should
+    extend behaviour via that generic rather than push to this list.")
+
+(defgeneric function-without-name-p (reference)
+  (:documentation "T if a box whose REFERENCE is this symbol/class renders
+   without the name strip (icon-only). Default checks membership in the
+   built-in *function-without-name* list; specialize per symbol via
+   (eql 'name) or per class to extend without mutating the list."))
+
+(defmethod function-without-name-p (reference)
+  (and (symbolp reference) (member reference *function-without-name*)))
 
 
 
@@ -1785,15 +2304,19 @@
                                                         average-pos)
                                     position))))))
    
+(defun frame-logical-position (frame)
+  (or (and (object frame) (frame-position (object frame)))
+      (om-view-position frame)))
+
 (defun average-position (frames)
   (om-make-point (average (mapcar #'(lambda (frame)
-                                      (om-point-h (om-view-position frame)))
-                                              frames)
-                                      nil)
-                 (average (mapcar #'(lambda (frame)
-                                      (om-point-v (om-view-position frame)))
+                                      (om-point-h (frame-logical-position frame)))
                                   frames)
-                          nil)))  
+                          nil)
+                 (average (mapcar #'(lambda (frame)
+                                      (om-point-v (frame-logical-position frame)))
+                                   frames)
+                           nil)))
                              
 
 (defmethod shrink-patch-window ((self ompatch))
@@ -1845,13 +2368,14 @@
                             (first match)))
                                   
 
-                        (let ((newin (make-new-patch-input (string+ "input" 
-                                                                    (if (= index 1)
-                                                                        ""
-                                                                      (string+ " " (prin1-to-string index)))) 
-                                                           (1- index)
-                                                           (om-make-point (+ (om-point-h (om-view-position source)) (* (second conn) 35))
-                                                                          (om-point-v (om-view-position source))))))
+                        (let* ((src-pos (frame-logical-position source))
+                               (newin (make-new-patch-input (string+ "input"
+                                                                     (if (= index 1)
+                                                                         ""
+                                                                       (string+ " " (prin1-to-string index))))
+                                                            (1- index)
+                                                            (om-make-point (+ (om-point-h src-pos) (* (second conn) 35))
+                                                                           (om-point-v src-pos)))))
                           (omng-add-element patch newin)
                           (push (list newin (first conn) (second conn) index) entries)
                           (setf input-ord (1- index))
@@ -1882,13 +2406,14 @@
   (loop for conn in bridges
         for destination = (nth (third conn) outside-boxes)
         for index from 1
-        for newout = (make-new-output (string+ "output" 
+        for dest-pos = (frame-logical-position destination)
+        for newout = (make-new-output (string+ "output"
                                                (if (= index 1)
                                                    ""
-                                                 (string+ " " (prin1-to-string index)))) 
+                                                 (string+ " " (prin1-to-string index))))
                                       (1- index)
-                                      (om-make-point (+ (om-point-h (om-view-position destination)) (* (fourth conn) 35))
-                                                     (om-point-v (om-view-position destination))))
+                                      (om-make-point (+ (om-point-h dest-pos) (* (fourth conn) 35))
+                                                     (om-point-v dest-pos)))
 
         do
         (omng-add-element patch newout)
@@ -1920,11 +2445,13 @@
          (pboxcall (omNG-make-new-boxcall patchabs
                                           (average-position actives)
                                           (mk-unique-name self "mypatch")))
-         (pframe (make-frame-from-callobj pboxcall)))
+         (pframe (let ((*make-frame-zoom-context*
+                        (and (typep self 'om-scroller) (om-zoom-of self))))
+                   (make-frame-from-callobj pboxcall))))
 
     ;insert new patch in current window
     (omG-add-element self pframe)
-    
+
 
     (let ((copies (loop for frame in actives
                         collect (eval (omng-copy (object frame)))))
@@ -1934,14 +2461,12 @@
           (coming-in (sort (mk-bridge-list (mapcar 'object inactives) (mapcar 'object actives))
                            #'<
                            :key #'(lambda (bridge)
-                                    (let ((source-frame (nth (car bridge) inactives)))
-                                      (om-point-h (om-view-position source-frame))))))
+                                    (om-point-h (frame-logical-position (nth (car bridge) inactives))))))
 
           (going-out (sort (mk-bridge-list (mapcar 'object actives) (mapcar 'object inactives))
                            #'<
                            :key #'(lambda (bridge)
-                                    (let ((dest-frame (nth (third bridge) inactives)))
-                                      (om-point-h (om-view-position dest-frame)))))))
+                                    (om-point-h (frame-logical-position (nth (third bridge) inactives)))))))
 
       ;add the copies to the new patch
       (loop for copy in copies
@@ -2005,9 +2530,12 @@
           if (equalp (type-of box) 'omout) do (push (list k (indice box)) outlet-alist))
 
     ; add the copies of all boxes except inlets and outlets into the parent patch, preserving the order (necessary?)
-    (loop for box in (reverse copies)  
+    (loop for box in (reverse copies)
           unless (is-inout-p box)
-          do (omg-add-element self (make-frame-from-callobj box)))
+          do (omg-add-element self
+                              (let ((*make-frame-zoom-context*
+                                     (and (typep self 'om-scroller) (om-zoom-of self))))
+                                (make-frame-from-callobj box))))
   
     ; make internal (non threshold) connections
     (remk-connections copies (mk-connection-list (boxes sub-patch)))

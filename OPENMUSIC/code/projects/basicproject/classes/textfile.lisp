@@ -90,6 +90,7 @@ As output it returns the contents of the text buffer as a list formatted accordi
          )))))
 |#
 
+#|
 (defmethod draw-obj-in-rect ((self textfile) x x1 y y1 edparams view)
    (let ((fontsize 10)
          (fontface (om-font-face (om-get-font view)))
@@ -108,6 +109,28 @@ As output it returns the contents of the text buffer as a list formatted accordi
                                                     :end (if (> (length item) charwidth) (- charwidth 1) (length item))
                                                     )))
                  )))))
+|#
+
+(defmethod draw-obj-in-rect ((self textfile) x x1 y y1 edparams view)
+  (let* ((zoom     (om-zoom-effective view))
+         (fontsize (max 1 (round (* 10 zoom))))
+         (fontface (om-font-face (om-get-font view)))
+         (lines    (list-of-lines (buffer-text self)))
+         (x-margin (max 1 (round (* 5  zoom))))
+         (line-h   (max 1 (round (* 12 zoom)))))
+    (when (buffer-text self)
+      (om-with-focused-view view
+        (om-with-font (om-make-font fontface fontsize)
+                (let* ((frame (associated-box self))
+                       (width (om-point-x (frame-size frame)))
+                       (charwidth (floor (/ width 5))))
+                        (loop for item in lines
+                              for i = 1 then (+ i 1)
+                              while (< (+ (* i line-h) y) y1) do
+                              (om-draw-string (+ x x-margin) (+ (* i line-h) y) item
+                                                   :end (if (> (length item) charwidth) (- charwidth 1) (length item))
+                                                   )))
+                )))))
 
 
 (defmethod get-slot-in-out-names ((self TextFile))
@@ -367,7 +390,7 @@ As output it returns the contents of the text buffer as a list formatted accordi
         (let ((inp 
                (if (and (nth i inputs) (string-equal (name input) (name (nth i inputs))))
                    (nth i inputs) input)))
-          ;;; ici : mettre à jour les items (thepopup) pour les input-funmenu
+          ;;; ici : mettre ï¿½ jour les items (thepopup) pour les input-funmenu
           inp)))
 
 

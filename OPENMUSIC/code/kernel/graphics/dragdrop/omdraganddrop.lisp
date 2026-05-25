@@ -41,6 +41,9 @@
     (opt-key-p :accessor opt-key-p :initform nil)
     (shift-key-p :accessor shift-key-p :initform nil)
     (initial-mouse-pos :initform nil :accessor initial-mouse-pos)
+    ;; Click in box-LOCAL pixels; preserved before om-drag-receive overwrites
+    ;; initial-mouse-pos with target-pane coords.
+    (click-on-dragged-box :initform nil :accessor click-on-dragged-box)
     (drop-mouse-pos :initform nil :accessor drop-mouse-pos)
     (drag-flavor :initform nil :accessor drag-flavor)))
 
@@ -83,6 +86,7 @@
           (setf (shift-key-p *OM-drag&drop-handler*) nil))
 	(setf (dragged-view *OM-drag&drop-handler*)  theview
 	      (initial-mouse-pos *OM-drag&drop-handler*) (om-mouse-position theview)
+	      (click-on-dragged-box *OM-drag&drop-handler*) (om-mouse-position theview)
 	      (dragged-list-objs *OM-drag&drop-handler*) (get-actives container)
 	      (container-view *OM-drag&drop-handler*) container
 	      (true-dragged-view *OM-drag&drop-handler*) view
@@ -217,31 +221,46 @@
 
 ;------MAKE SLOTBOX WITH SHIFT_KEY
 
+#|
 (defmethod perform-make-slots-view ((D&DHandler omdrag-drop))
   (let ((pos0 (get-position (dragged-view D&DHandler))))
     (mapc #'(lambda (oneobject)
               (OMGMoveObject oneobject
                              (om-add-points
-                             ; (om-subtract-points (get-position oneobject) pos0) 
+                             ; (om-subtract-points (get-position oneobject) pos0)
                               (om-view-position oneobject)
                               (om-subtract-points (drop-mouse-pos D&DHandler) (initial-mouse-pos D&DHandler))
                              )
                              )
               )
-      (dragged-list-objs D&DHandler)) 
+      (dragged-list-objs D&DHandler))
     t)
   )
+|#
+
+(defmethod perform-make-slots-view ((D&DHandler omdrag-drop))
+  (mapc #'(lambda (oneobject)
+            (let* ((zoom        (om-zoom-effective oneobject))
+                   (delta-vis   (om-subtract-points (drop-mouse-pos D&DHandler) (initial-mouse-pos D&DHandler)))
+                   (visual-curr (om-view-position oneobject))
+                   (new-visual  (om-add-points visual-curr delta-vis))
+                   (new-logical (if (= zoom 1.0) new-visual (om-zoom-unscale-point new-visual zoom)))
+                   (*om-zoom-drag-visual-pos* new-visual))
+              (OMGMoveObject oneobject new-logical)))
+        (dragged-list-objs D&DHandler))
+  t)
 
 
 
                  
 ;------MOVE IN THE SAME WINDOW
+#|
 (defmethod perform-move-view ((D&DHandler omdrag-drop))
   (let ((pos0 (get-position (dragged-view D&DHandler))))
     (mapc #'(lambda (oneobject)
               (OMGMoveObject oneobject
                              (om-add-points
-                             ; (om-subtract-points (get-position oneobject) pos0) 
+                             ; (om-subtract-points (get-position oneobject) pos0)
                               (om-view-position oneobject)
                               (om-subtract-points (drop-mouse-pos D&DHandler) (initial-mouse-pos D&DHandler))
                              )
@@ -249,15 +268,42 @@
               )
       (dragged-list-objs D&DHandler)) t)
   )
+|#
+
+(defmethod perform-move-view ((D&DHandler omdrag-drop))
+  (mapc #'(lambda (oneobject)
+            (let* ((zoom        (om-zoom-effective oneobject))
+                   (delta-vis   (om-subtract-points (drop-mouse-pos D&DHandler) (initial-mouse-pos D&DHandler)))
+                   (visual-curr (om-view-position oneobject))
+                   (new-visual  (om-add-points visual-curr delta-vis))
+                   (new-logical (if (= zoom 1.0) new-visual (om-zoom-unscale-point new-visual zoom)))
+                   (*om-zoom-drag-visual-pos* new-visual))
+              (OMGMoveObject oneobject new-logical)))
+        (dragged-list-objs D&DHandler))
+  t)
 
 
 ;Move in the same object
+#|
 (defmethod perform-special-move-view ((D&DHandler omdrag-drop))
    (mapc #'(lambda (oneobject)
              (OMGMoveObject oneobject
                             (om-add-points (get-position oneobject)
                                            (om-subtract-points (drop-mouse-pos D&DHandler) (initial-mouse-pos D&DHandler)))))
-     (dragged-list-objs D&DHandler)) 
+     (dragged-list-objs D&DHandler))
+  t)
+|#
+
+(defmethod perform-special-move-view ((D&DHandler omdrag-drop))
+  (mapc #'(lambda (oneobject)
+            (let* ((zoom        (om-zoom-effective oneobject))
+                   (delta-vis   (om-subtract-points (drop-mouse-pos D&DHandler) (initial-mouse-pos D&DHandler)))
+                   (visual-curr (get-position oneobject))
+                   (new-visual  (om-add-points visual-curr delta-vis))
+                   (new-logical (if (= zoom 1.0) new-visual (om-zoom-unscale-point new-visual zoom)))
+                   (*om-zoom-drag-visual-pos* new-visual))
+              (OMGMoveObject oneobject new-logical)))
+        (dragged-list-objs D&DHandler))
   t)
 
 
@@ -273,6 +319,7 @@
 
 (defmethod perform-drop-list ((dd t) (dragged t) (target t) pos) nil)
 
+#|
 (defmethod perform-change-view ((D&DHandler omdrag-drop))
   (let* ((target-frame (get-drag-object (target-view  D&DHandler)))
          (pos0 (get-position (get-drag-object (dragged-view D&DHandler))))
@@ -285,13 +332,13 @@
           while correctmove do
             (setf correctmove (drop-allow-p D&DHandler (object item) (object target-frame))))
     (if correctmove
-        (progn 
+        (progn
           ;; removes the connections to other boxes. problem if we want to restore them (e.g. externalize)
           (make-delete-before (container-view D&DHandler) (dragged-list-objs D&DHandler) target-frame)
           (if (allow-drag-list (object target-frame))
               (setf some-item-used (perform-drop-list D&DHandler (dragged-list-objs D&DHandler) target-frame
                                                       (om-add-points
-                                                       (om-subtract-points (get-position (car (dragged-list-objs D&DHandler))) pos0) 
+                                                       (om-subtract-points (get-position (car (dragged-list-objs D&DHandler))) pos0)
                                                        (om-subtract-points (drop-mouse-pos D&DHandler) (initial-mouse-pos D&DHandler)))))
             (progn
               (loop for i in list-objs
@@ -303,7 +350,7 @@
               (mapc #'(lambda (dragged-frame)
                         (setf some-item-used (perform-drop D&DHandler dragged-frame target-frame
                                                            (om-add-points  (drop-mouse-pos D&DHandler)
-                                                                           (om-subtract-points 
+                                                                           (om-subtract-points
                                                                             (get-position dragged-frame)
                                                                             (initial-mouse-pos D&DHandler))))))
                     (dragged-list-objs D&DHandler))))
@@ -312,7 +359,62 @@
           ;;; new attention a tester...
           (when (patchpanel-p target-frame) (modify-patch target-frame)))
       (om-beep))
-    (om-invalidate-view target-frame) 
+    (om-invalidate-view target-frame)
+    some-item-used))
+|#
+
+;; Cross-pane drop: landing position computed in LOGICAL via each pane's
+;; own zoom. Does NOT use initial-mouse-pos because om-convert-coordinates
+;; is unreliable cross-window (ignores screen offset between windows).
+(defmethod perform-change-view ((D&DHandler omdrag-drop))
+  (let* ((target-frame (get-drag-object (target-view D&DHandler)))
+         (pos0 (get-position (get-drag-object (dragged-view D&DHandler))))
+         (list-objs (mapcar #'(lambda (frame) (object frame)) (dragged-list-objs D&DHandler)))
+         (connectlist (save-connections target-frame (container-view D&DHandler) list-objs))
+         (some-item-used nil)
+         (correctmove t)
+         (source-zoom (or (and (container-view D&DHandler) (om-zoom-effective (container-view D&DHandler))) 1.0))
+         (target-zoom (or (and target-frame (om-zoom-effective target-frame)) 1.0))
+         (primary-V   (get-position (dragged-view D&DHandler)))
+         (primary-L   (if (= source-zoom 1.0) primary-V (om-zoom-unscale-point primary-V source-zoom)))
+         (click-V     (click-on-dragged-box D&DHandler))
+         (click-L     (if (or (null click-V) (= source-zoom 1.0))
+                          (or click-V (om-make-point 0 0))
+                        (om-zoom-unscale-point click-V source-zoom)))
+         (drop-V      (drop-mouse-pos D&DHandler))
+         (drop-L      (if (= target-zoom 1.0) drop-V (om-zoom-unscale-point drop-V target-zoom))))
+    (loop for item in (dragged-list-objs D&DHandler)
+          while correctmove do
+            (setf correctmove (drop-allow-p D&DHandler (object item) (object target-frame))))
+    (flet ((frame-target-V (dragged-frame)
+             (let* ((this-V (get-position dragged-frame))
+                    (this-L (if (= source-zoom 1.0) this-V (om-zoom-unscale-point this-V source-zoom)))
+                    (rel-L  (om-subtract-points this-L primary-L))
+                    (new-L  (om-add-points (om-subtract-points drop-L click-L) rel-L)))
+               (if (= target-zoom 1.0) new-L (om-zoom-scale-point new-L target-zoom)))))
+      (if correctmove
+          (progn
+            (make-delete-before (container-view D&DHandler) (dragged-list-objs D&DHandler) target-frame)
+            (if (allow-drag-list (object target-frame))
+                (setf some-item-used
+                      (perform-drop-list D&DHandler (dragged-list-objs D&DHandler) target-frame
+                                         (frame-target-V (car (dragged-list-objs D&DHandler)))))
+              (progn
+                (loop for i in list-objs
+                      do (when (typep i 'omtextfilebox)
+                           (let* ((subframes (list i))
+                                  (copies (mapcar #'(lambda (frame)
+                                                      (eval (omNG-copy frame))) subframes)))
+                             (setf some-item-used (perform-duplicate-list D&DHandler (object target-frame) target-frame subframes copies pos0)))))
+                (mapc #'(lambda (dragged-frame)
+                          (setf some-item-used
+                                (perform-drop D&DHandler dragged-frame target-frame
+                                              (frame-target-V dragged-frame))))
+                      (dragged-list-objs D&DHandler))))
+            (remake-draggeds-connections target-frame (container-view D&DHandler) list-objs connectlist)
+            (when (patchpanel-p target-frame) (modify-patch target-frame)))
+        (om-beep)))
+    (om-invalidate-view target-frame)
     some-item-used))
 
   

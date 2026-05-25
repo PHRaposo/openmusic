@@ -754,10 +754,11 @@ The matrix \"components\" can be accessed and modified using the functions get-c
   
 
 
+#|
 (defmethod draw-obj-in-rect ((self class-array) x x1 y y1 edparams view)
   (let* ((visibles (get-draw-visibles-list self edparams))
          (numvis (length visibles)))
-    (unless (or (<= numvis 0) (<= (numcols self) 0)) 
+    (unless (or (<= numvis 0) (<= (numcols self) 0))
       (let ((deltay (max 8 (floor (- y1 y) numvis)))
             (width (- x1 x))
             (jumpx 1))
@@ -767,7 +768,7 @@ The matrix \"components\" can be accessed and modified using the functions get-c
           (om-with-focused-view view
           (loop for i in visibles
                 for posy = y then (+ posy deltay) do
-                (let* ((row (get-array-row self i))                     
+                (let* ((row (get-array-row self i))
                        (bpf? (get-row-bpf self row))
                        (color (nth i (get-param  edparams 'color-list))))
                   (if bpf?
@@ -779,9 +780,9 @@ The matrix \"components\" can be accessed and modified using the functions get-c
                           (loop for di = 0 then (+ di 1)
                                 for posx = (+ x (* di deltax))
                                 while (< posx x1)  do
-                                (om-with-clip-rect view (om-make-rect (min posx x) (min posy y) 
+                                (om-with-clip-rect view (om-make-rect (min posx x) (min posy y)
                                                                       (min (+ posx deltax) x1) (min (+ posy deltay) y1))
-                                  (draw-obj-in-rect (nth (* di jumpx) row) posx (+ posx deltax) posy (+ posy deltay) 
+                                  (draw-obj-in-rect (nth (* di jumpx) row) posx (+ posx deltax) posy (+ posy deltay)
                                                     (default-edition-params (nth (* di jumpx) row)) view)
                                   )
                                 (om-draw-line posx posy posx (+ posy deltay)))
@@ -789,6 +790,48 @@ The matrix \"components\" can be accessed and modified using the functions get-c
                         )))
                 (om-draw-line x (+ posy deltay) x1  (+ posy deltay))
                 ))))))))
+|#
+
+(defmethod draw-obj-in-rect ((self class-array) x x1 y y1 edparams view)
+  (let* ((zoom     (om-zoom-effective view))
+         (pen      (max 1 (round zoom)))
+         (visibles (get-draw-visibles-list self edparams))
+         (numvis   (length visibles))
+         (*om-zoom-mini-helper-scale* zoom))
+    (declare (special *om-zoom-mini-helper-scale*))
+    (unless (or (<= numvis 0) (<= (numcols self) 0))
+      (let ((deltay (max 8 (floor (- y1 y) numvis)))
+            (width (- x1 x))
+            (jumpx 1))
+        (loop while (< (/ width (/ (numcols self) jumpx)) 12) do (incf jumpx))
+        (let* ((nbobjsinx (max 1 (round (numcols self) jumpx)))
+              (deltax (ceiling width nbobjsinx)))
+          (om-with-focused-view view
+          (om-with-line-size pen
+          (loop for i in visibles
+                for posy = y then (+ posy deltay) do
+                (let* ((row (get-array-row self i))
+                       (bpf? (get-row-bpf self row))
+                       (color (nth i (get-param  edparams 'color-list))))
+                  (if bpf?
+                      (progn
+                        (setf (bpfcolor bpf?) color)
+                        (draw-obj-in-rect bpf? x x1  posy (+ posy deltay) nil view))
+                    (om-with-fg-color view (or color *om-black-color*)
+                      (if (consp row)
+                          (loop for di = 0 then (+ di 1)
+                                for posx = (+ x (* di deltax))
+                                while (< posx x1)  do
+                                (om-with-clip-rect view (om-make-rect (min posx x) (min posy y)
+                                                                      (min (+ posx deltax) x1) (min (+ posy deltay) y1))
+                                  (draw-obj-in-rect (nth (* di jumpx) row) posx (+ posx deltax) posy (+ posy deltay)
+                                                    (default-edition-params (nth (* di jumpx) row)) view)
+                                  )
+                                (om-draw-line posx posy posx (+ posy deltay)))
+                        ;(draw-obj-in-rect row x x1 posy (+ posy deltay) (default-edition-params row) view)
+                        )))
+                (om-draw-line x (+ posy deltay) x1  (+ posy deltay))
+                )))))))))
 
 
 (defmethod update-miniview ((self t) (type class-array)) (om-invalidate-view self))

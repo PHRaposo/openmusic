@@ -47,8 +47,9 @@
      (setf (name rep) name) 
      rep))
 
+#|
 (defmethod make-frame-from-callobj ((self score-box))
-   (let* ((module (om-make-view (get-frame-class self) 
+   (let* ((module (om-make-view (get-frame-class self)
                                 :position (frame-position self)
                     :help-spec (get-documentation self)
                     :size  (frame-size self)
@@ -56,10 +57,10 @@
           (input (car (inputs self)))
           thenewout inputf)
      (setf thenewout (om-make-view (get-out-class self)
-                                   :position 
-                                   #+(or linux win32)(om-make-point (- (round (om-point-h (frame-size self)) 2) 4) 
+                                   :position
+                                   #+(or linux win32)(om-make-point (- (round (om-point-h (frame-size self)) 2) 4)
                                                                     (+ (h module) 10))
-                                   #+macosx(om-make-point (- (round (om-point-h (frame-size self)) 2) 4) 
+                                   #+macosx(om-make-point (- (round (om-point-h (frame-size self)) 2) 4)
                                                           (+ (h module) 2))
                                    :size (om-make-point 8 8)
                                    :help-spec "option-click to evalue or drag for connections"
@@ -67,7 +68,46 @@
      (push thenewout (outframes module))
      (om-add-subviews module thenewout )
      (setf (name module) (frame-name self))
-     (setf (frames self) (list module)) 
+     (setf (frames self) (list module))
+     module
+     ))
+|#
+
+(defmethod make-frame-from-callobj ((self score-box))
+   (let* ((zoom    (or *make-frame-zoom-context* 1.0))
+          (scale-p (and (numberp zoom) (/= zoom 1.0)))
+          (logical-pos  (frame-position self))
+          (logical-size (frame-size self))
+          (module-vpos  (if (and scale-p logical-pos)
+                            (om-zoom-scale-point logical-pos zoom)
+                            logical-pos))
+          (module-vsize (if (and scale-p logical-size)
+                            (om-zoom-scale-point logical-size zoom)
+                            logical-size))
+          (module (om-make-view (get-frame-class self)
+                                :position module-vpos
+                                :help-spec (get-documentation self)
+                                :size  module-vsize
+                                :object self))
+          (input (car (inputs self)))
+          (io-size (if scale-p (max 1 (round (* 8 zoom))) 8))
+          (off-x   (if scale-p (round (* 4 zoom)) 4))
+          (off-y10 (if scale-p (round (* 10 zoom)) 10))
+          (off-y2  (if scale-p (round (* 2 zoom)) 2))
+          thenewout inputf)
+     (setf thenewout (om-make-view (get-out-class self)
+                                   :position
+                                   #+(or linux win32)(om-make-point (- (round (om-point-h module-vsize) 2) off-x)
+                                                                    (+ (h module) off-y10))
+                                   #+macosx(om-make-point (- (round (om-point-h module-vsize) 2) off-x)
+                                                          (+ (h module) off-y2))
+                                   :size (om-make-point io-size io-size)
+                                   :help-spec "option-click to evalue or drag for connections"
+                                   :index 0))
+     (push thenewout (outframes module))
+     (om-add-subviews module thenewout )
+     (setf (name module) (frame-name self))
+     (setf (frames self) (list module))
      module
      ))
 
@@ -347,7 +387,9 @@ unless option+shift keys."
      (loop for i in (send-receive-keys self) 
          do (open-all-keys i))
      (mapc #'(lambda (elem)
-               (let ((newframe (make-frame-from-callobj elem)))
+               (let ((newframe (let ((*make-frame-zoom-context*
+                                      (and (typep self 'om-scroller) (om-zoom-of self))))
+                                 (make-frame-from-callobj elem))))
                  (om-add-subviews self newframe)
                  (add-subview-extra newframe))) elements)
      (mapc #'(lambda (elem)
@@ -391,11 +433,13 @@ unless option+shift keys."
           (size (round (staff-size self) 8)))
      (list mode-obj (selection? self))
      (loop for item in (get-graph-selection? self mode-obj) do
-           (let* ((newconst (make-score-box  (reference item) 'score-box 
+           (let* ((newconst (make-score-box  (reference item) 'score-box
                                              (get-posi-score-box item size)
                                              "musical box"
                                              (get-size-score-box item size)))
-                  (frame (make-frame-from-callobj newconst)))
+                  (frame (let ((*make-frame-zoom-context*
+                                (and (typep self 'om-scroller) (om-zoom-of self))))
+                           (make-frame-from-callobj newconst))))
              (setf (selection? self) (remove  (reference item) (selection? self) :test 'equal))
              (setf (selected item) nil)
              (omG-add-element self frame)))))
@@ -464,6 +508,9 @@ unless option+shift keys."
 
 (defmethod pixel2point ((self scorepanel) pixel)
    (om-make-point (pixel-toms self pixel) (om-point-v pixel)))
+
+(defmethod pixel2point ((self measurepanel) pixel)
+   (om-make-point (pixels-to-time self (om-point-x pixel)) (om-point-v pixel)))
 
 (defmethod pixel2point ((self measurepanel) pixel)
    (om-make-point (pixels-to-time self (om-point-x pixel)) (om-point-v pixel)))

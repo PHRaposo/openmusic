@@ -348,11 +348,27 @@ Documentation for other metaobjects like omClasses are handled by MCL. #doc#
   (setf (nth 1 (wsparams self)) newpos))
 
 (defmethod set-win-size ((self t) newsize) (declare (ignore newsize)) "Set the editor's size to 'newsize'" t)
-(defmethod set-win-size ((self OMPersistantObject) newsize) 
+(defmethod set-win-size ((self OMPersistantObject) newsize)
   (ensure-ws-params self)
   (setf (changed-wsparams? self) t)
   (setf (nth 2 (wsparams self)) newsize))
 
+(defgeneric get-win-zoom (self))
+(defgeneric set-win-zoom (self zoom))
+
+(defmethod get-win-zoom ((self t)) 1.0)
+(defmethod get-win-zoom ((self OMPersistantObject))
+  (let ((ws (wsparams self)))
+    (or (and (>= (length ws) 4) (fourth ws)) 1.0)))
+
+(defmethod set-win-zoom ((self t) zoom) (declare (ignore zoom)))
+(defmethod set-win-zoom ((self OMPersistantObject) zoom)
+  (ensure-ws-params self)
+  (setf (changed-wsparams? self) t)
+  (let ((ws (wsparams self)))
+    (if (>= (length ws) 4)
+        (setf (nth 3 ws) zoom)
+        (nconc ws (list zoom)))))
 
 
 

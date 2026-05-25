@@ -78,10 +78,13 @@ in relation with the reference.#reference#
 (defgeneric get-frame-name (box)  
    (:documentation "get the name that will be showed in the box's frame."))
 
-(defgeneric make-frame-from-callobj (box)  
+(defgeneric make-frame-from-callobj (box)
    (:documentation "Cons the frame that visualize the object 'box'."))
 
-(defgeneric remove-extra (patch box)  
+(defvar *make-frame-zoom-context* nil
+  "Bound around make-frame-from-callobj to the destination panel's zoom.")
+
+(defgeneric remove-extra (patch box)
    (:documentation "Called when you remove the box 'box' from the patch 'patch'."))
 
 (defmethod omng-MoveObject ((self OMBox) newpos)
@@ -96,8 +99,7 @@ in relation with the reference.#reference#
 
 (defmethod get-frame-name ((self OMBox))
    "NIL if the frame does not show a name (i.e. 'om+ function or editors)"
-   (declare (special *function-without-name*))
-   (unless (member (reference self) *function-without-name*)
+   (unless (function-without-name-p (reference self))
      (let ((thename (string (reference self))))
        (string-downcase thename))))
 
@@ -109,8 +111,8 @@ in relation with the reference.#reference#
 
 (defmethod spec-obj-icon-size ((self t)) nil)
 
-(defmethod def-icon-size ((self ombox)) 
-  (if (member (reference self) *function-without-name*)
+(defmethod def-icon-size ((self ombox))
+  (if (function-without-name-p (reference self))
       (let ((icn (second (get&corrige-icon (icon self)))))
         (list (om-pict-width icn) (om-pict-height icn)))
     (or (spec-obj-icon-size (reference self))
@@ -133,70 +135,96 @@ in relation with the reference.#reference#
          (numouts (numouts self))
          (index 0)
          (size-name (round (get-name-size name boxnamefont)))
-         (h-name (if name (+ 3 (om-string-h boxnamefont))0))
+         (h-name (if name (+ 3 (om-string-h boxnamefont)) 0))
+         (zoom (or *make-frame-zoom-context* 1.0))
+         (scale-p (and (numberp zoom) (/= zoom 1.0)))
          input-frames module boxframex)
-    
+
     (setf (inputs self) (update-inputs (reference self) (inputs self)))
-    
+
     (setf boxframex (if (frame-size self)
                         (om-point-h (frame-size self))
-                      (apply #'max (list (first iconsize) 
-                                         (* (boxinputs-sizefactor self) numouts) 
-                                         (* (boxinputs-sizefactor self) (length (inputs self))) 
+                      (apply #'max (list (first iconsize)
+                                         (* (boxinputs-sizefactor self) numouts)
+                                         (* (boxinputs-sizefactor self) (length (inputs self)))
                                          size-name))))
-        
-    (setf input-frames (mapcar #'(lambda (input)   
-                                   (let ((docstr (doc-string input)))
-                                     (setf index (+ index 1))
-                                     (om-make-view (or (spec-input-frame self (- index 1)) (get-input-class-frame self))
-                                                   :object input
-                                                   :help-spec (string+ "<" (string-downcase (name input))
-                                                                       ">" (if (and docstr (not (string-equal docstr "")))
-                                                                               (string+ " " (doc-string input)) ""))
-                                                   :size (om-make-point 8 8)
-                                                   :position (om-make-point (- (* index (round boxframex (+ (length (inputs self)) 1))) 4) 
-                                                                            1)
-                                                   )
-                                     ))
-                               (inputs self)))
-    (setq module
-          (om-make-view (get-frame-class self)
-                        :position (frame-position self)
-                        ;;;:help-spec (get-documentation self)
-                        :size (om-make-point boxframex (+ (second iconsize) (+ 19 h-name)))
-                        :object self
-                        :subviews input-frames
-                        ))
-   
-    (setf (inputframes module) input-frames)
-    ;;;(loop for input-f in input-frames do (om-add-subviews module input-f))
-    
-    (make-outputs-of-frame self module)
-    (setf (outframes module) (reverse (outframes module)))
-    (setf (name module) name)
-    (setf (frames self) (list module))
-    (om-add-subviews module (setf (iconView module)
-                                  (om-make-view (get-icon-box-class self)
-                                                :iconID icon
-                                                :help-spec (get-box-documentation self)
-                                                :size (om-make-point (first iconsize) (second iconsize))
-                                                :position (om-make-point (round (- (w module) (first iconsize)) 2) 10))))
-    (when name
-      (om-add-subviews module (setf (nameView module)
-                                    (om-make-dialog-item 'box-dialog-name     
-                                                         (om-make-point (+  (x (iconView module)) (round (- (first iconsize) size-name) 2))
-                                                                        (- (h module) (+ 10 h-name)))                                 
-                                                         (om-make-point size-name h-name)
-                                                         name
-                                                         :value name
-                                                         :font boxnamefont
-                                                         :help-spec (get-documentation self)
-                                                         
-                                                         ))))
-    (when (allow-lock self)
-      (add-lock-button module (allow-lock self)))
-    (add-box-resize module)
-    module))
+
+    (let* ((module-logical-size (om-make-point boxframex (+ (second iconsize) 19 h-name)))
+           (module-logical-pos  (frame-position self))
+           (module-vsize (if scale-p (om-zoom-scale-point module-logical-size zoom) module-logical-size))
+           (module-vpos  (if (and scale-p module-logical-pos)
+                             (om-zoom-scale-point module-logical-pos zoom)
+                             module-logical-pos))
+           (io-size-v (if scale-p (max 1 (round (* 8 zoom))) 8))
+           (io-y-v    (if scale-p (max 0 (round (* 1 zoom))) 1)))
+
+      (setf input-frames
+            (mapcar #'(lambda (input)
+                        (let ((docstr (doc-string input)))
+                          (setf index (+ index 1))
+                          (let* ((x-log (- (* index (round boxframex (+ (length (inputs self)) 1))) 4))
+                                 (x-v   (if scale-p (round (* x-log zoom)) x-log)))
+                            (om-make-view (or (spec-input-frame self (- index 1)) (get-input-class-frame self))
+                                          :object input
+                                          :help-spec (string+ "<" (string-downcase (name input))
+                                                              ">" (if (and docstr (not (string-equal docstr "")))
+                                                                      (string+ " " (doc-string input)) ""))
+                                          :size (om-make-point io-size-v io-size-v)
+                                          :position (om-make-point x-v io-y-v)))))
+                    (inputs self)))
+
+      (setq module
+            (om-make-view (get-frame-class self)
+                          :position module-vpos
+                          :size module-vsize
+                          :object self
+                          :subviews input-frames))
+
+      (setf (inputframes module) input-frames)
+      (make-outputs-of-frame self module)
+      (setf (outframes module) (reverse (outframes module)))
+      (setf (name module) name)
+      (setf (frames self) (list module))
+      ;; Stamp LOGICAL on the FRAME (not on the OBJECT) so frame-size of
+      ;; OBJECT stays NIL until the user resizes; otherwise draw-before-box
+      ;; would draw the gray rect on a fresh box.
+      (setf (om-zoom-logical-size module) module-logical-size)
+      (when module-logical-pos
+        (setf (om-zoom-logical-pos module) module-logical-pos))
+
+      (let* ((iw-v (if scale-p (max 1 (round (* (first iconsize) zoom))) (first iconsize)))
+             (ih-v (if scale-p (max 1 (round (* (second iconsize) zoom))) (second iconsize)))
+             (ix-v (round (- (om-point-h module-vsize) iw-v) 2))
+             (iy-v (if scale-p (max 0 (round (* 10 zoom))) 10)))
+        (om-add-subviews module (setf (iconView module)
+                                      (om-make-view (get-icon-box-class self)
+                                                    :iconID icon
+                                                    :help-spec (get-box-documentation self)
+                                                    :size (om-make-point iw-v ih-v)
+                                                    :position (om-make-point ix-v iy-v))))
+        (when name
+          (let* ((scaled-font (if scale-p (om-zoom-scale-font boxnamefont zoom) boxnamefont))
+                 (real-text-h (max 1 (om-string-h scaled-font)))
+                 (nw-v (if scale-p (max 1 (round (* size-name zoom))) size-name))
+                 (nh-v (+ 3 real-text-h))
+                 (nx-v (+ ix-v (round (- iw-v nw-v) 2)))
+                 (icon-bottom-v (+ iy-v ih-v))
+                 (ny-v (- icon-bottom-v 1))
+                 (nameview-instance
+                  (om-make-dialog-item 'box-dialog-name
+                                       (om-make-point nx-v ny-v)
+                                       (om-make-point nw-v nh-v)
+                                       name
+                                       :value name
+                                       :font scaled-font
+                                       :help-spec (get-documentation self))))
+            (when scale-p
+              (setf (om-zoom-logical-font nameview-instance) boxnamefont))
+            (om-add-subviews module (setf (nameView module) nameview-instance))))
+        (when (allow-lock self)
+          (add-lock-button module (allow-lock self)))
+        (add-box-resize module)
+        module))))
 
 ;--------------------------------------------------
 ;Other methods
@@ -226,17 +254,26 @@ in relation with the reference.#reference#
 
 
 (defmethod make-outputs-of-frame ((self OMBox) module)
-   "Cons a list of views which are the outputs of the box."
-   (let ((numouts (numouts self)))
-     (loop for i from 0 to (- numouts 1) do
-           (let ((thenewout (om-make-view (get-out-class self)
-                                              :position (om-make-point (- (* (+ i 1) (round (w module) (+ numouts 1))) 4) 
-                                                         (- (h module) 9))
-                                              :size (om-make-point 8 8)
-                              :help-spec (get-output-text self i)
-                              :index i)))
-             (push thenewout (outframes module))
-             (om-add-subviews module thenewout)))))
+  "Cons a list of views which are the outputs of the box."
+  ;; (w module) and (h module) are already VISUAL (module was built with
+  ;; pre-scaled :size in make-frame-from-callobj); only the literal offsets
+  ;; (4, 9) and io-size (8) need scaling.
+  (let* ((numouts (numouts self))
+         (zoom    (or *make-frame-zoom-context* 1.0))
+         (scale-p (and (numberp zoom) (/= zoom 1.0)))
+         (io-size (if scale-p (max 1 (round (* 8 zoom))) 8))
+         (off-x   (if scale-p (round (* 4 zoom)) 4))
+         (off-y   (if scale-p (round (* 9 zoom)) 9)))
+    (loop for i from 0 to (- numouts 1) do
+          (let ((thenewout (om-make-view (get-out-class self)
+                                         :position (om-make-point
+                                                    (- (* (+ i 1) (round (w module) (+ numouts 1))) off-x)
+                                                    (- (h module) off-y))
+                                         :size (om-make-point io-size io-size)
+                                         :help-spec (get-output-text self i)
+                                         :index i)))
+            (push thenewout (outframes module))
+            (om-add-subviews module thenewout)))))
 
 
 (defmethod omNG-make-alias ((self OMBox))

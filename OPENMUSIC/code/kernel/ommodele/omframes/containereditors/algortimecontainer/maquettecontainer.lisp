@@ -471,7 +471,7 @@
 ;PANEL
 ;--------------------------
 
-(defclass MaquettePanel (patchPanel view-with-ruler-xy cursor-play-view-mixin) 
+(defclass MaquettePanel (patchPanel view-with-ruler-xy cursor-play-view-mixin)
    (;(mode :initform 7 :accessor mode)
     (selected-mark-lines :initform nil :accessor selected-mark-lines)
     (scroll-scrap-ma :initform nil :allocation :class :accessor scroll-scrap-ma))
@@ -479,6 +479,14 @@
  Elements of these editors are tempobjframe instances.#enddoc#
 #seealso# (OMMaquette tempobjframe temporalbox) #seealso#")
    )
+
+;; Maquette has its own native zoom (rangex/rangey + cursor-mode :zoom).
+;; Pin the generic per-pane factor to 1.0 to opt out of the canvas zoom.
+(defmethod om-zoom-of ((pane MaquettePanel)) 1.0)
+(defmethod (setf om-zoom-of) (value (pane MaquettePanel))
+  (declare (ignore value)) 1.0)
+
+(defmethod om-zoom-applies-p ((pane MaquettePanel)) nil)
 
 (defmethod delete-general :after ((self maquettepanel))
   (when (and (patchview (editor self)) (selected (patchview (editor self))))
@@ -675,7 +683,9 @@
      (add-temp-boxes new-patch)
      (setf (slot-value tempobj 'extend) (pixel2norme  self 'x pixsizex))
      (setf (slot-value tempobj 'sizey)  y-size)
-     (setf new-frame (make-frame-from-callobj tempobj))
+     (setf new-frame (let ((*make-frame-zoom-context*
+                            (and (typep self 'om-scroller) (om-zoom-of self))))
+                       (make-frame-from-callobj tempobj)))
      (omG-add-element self new-frame)))
 
 ;; ***
@@ -700,7 +710,9 @@
           new-frame)
      (setf (slot-value tempobj 'extend) (pixel2norme  self 'x pixsizex))
      (setf (slot-value tempobj 'sizey)  y-size)
-     (setf new-frame (make-frame-from-callobj tempobj))
+     (setf new-frame (let ((*make-frame-zoom-context*
+                            (and (typep self 'om-scroller) (om-zoom-of self))))
+                       (make-frame-from-callobj tempobj)))
      (omG-add-element self new-frame)))
        
 

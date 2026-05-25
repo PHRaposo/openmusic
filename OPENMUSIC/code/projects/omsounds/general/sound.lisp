@@ -910,11 +910,12 @@ Press 'space' to play/stop the sound file.
 (defmethod draw-mini-view ((self t) (val sound))
   (draw-obj-in-rect val 0 (w self) 0 (h self) (view-get-ed-params self) self))
 
+#|
 (defmethod draw-obj-in-rect ((self sound) x x1 y y1 edparams view)
   (let ((picture (if (and (pict-spectre self) (get-param edparams :show-spectrum))
                      (thepict (pict-spectre self))
                    (sound-get-pict self))))
-    (om-with-focused-view view 
+    (om-with-focused-view view
       (if picture
           (let ((dur (/ (om-sound-n-samples self) (om-sound-sample-rate self)))
                 (pos x) (w (- x1 x)))
@@ -925,7 +926,7 @@ Press 'space' to play/stop the sound file.
                 (loop for item in (markers self) do
                       (setf pos (+ x (round (* w item) dur)))
                       (om-draw-line pos y pos y1)))))
-        (if (om-sound-n-channels self) 
+        (if (om-sound-n-channels self)
             (om-with-font *om-default-font1*
                           (om-draw-string 5 14 (format nil "~A" (file-namestring (filename self))))
                           (om-draw-string 5 28 (format nil "~A channels" (om-sound-n-channels self))))
@@ -939,6 +940,42 @@ Press 'space' to play/stop the sound file.
       ;(when (and (om-sound-n-samples self) (zerop (om-sound-n-samples self)))
       ;  (om-draw-string 15 15 (om-str "Error")))
       )))
+|#
+
+(defmethod draw-obj-in-rect ((self sound) x x1 y y1 edparams view)
+  (let* ((picture (if (and (pict-spectre self) (get-param edparams :show-spectrum))
+                      (thepict (pict-spectre self))
+                    (sound-get-pict self)))
+         (zoom        (om-zoom-effective view))
+         (scaled-font (if (= zoom 1.0) *om-default-font1* (om-zoom-scale-font *om-default-font1* zoom)))
+         (xm  (max 1 (round (* 5  zoom))))
+         (y1l (max 1 (round (* 14 zoom))))
+         (y2l (max 1 (round (* 28 zoom)))))
+    (om-with-focused-view view
+      (if picture
+          (let ((dur (/ (om-sound-n-samples self) (om-sound-sample-rate self)))
+                (pos x) (w (- x1 x)))
+            (om-with-fg-color view *om-dark-gray-color*
+              (om-draw-picture view picture :pos (om-make-point x y) :size (om-make-point (- x1 x) (- y1 y))))
+            (om-with-fg-color view *om-steel-blue-color*
+              (om-with-line '(2 2)
+                (loop for item in (markers self) do
+                      (setf pos (+ x (round (* w item) dur)))
+                      (om-draw-line pos y pos y1)))))
+        (if (om-sound-n-channels self)
+            (om-with-font scaled-font
+                          (om-draw-string xm y1l (format nil "~A" (file-namestring (filename self))))
+                          (om-draw-string xm y2l (format nil "~A channels" (om-sound-n-channels self))))
+          (let ((path (om-sound-file-name self)))
+            (when path
+              (om-with-font scaled-font
+                            (om-draw-string xm y1l (string+ (pathname-name path) (if (stringp (pathname-type path)) (string+ "." (pathname-type path)) "")
+                                                          ":"))
+                            (om-draw-string xm y2l (if (probe-file path) (om-str :file-error)
+                                                   (string+ (format nil (om-str :file-not-found) (pathname-name path)) "...")))))))))
+      ;(when (and (om-sound-n-samples self) (zerop (om-sound-n-samples self)))
+      ;  (om-draw-string 15 15 (om-str "Error")))
+      ))
 
 
 (defmethod update-miniview ((self t) (type sound))  (om-invalidate-view self t))

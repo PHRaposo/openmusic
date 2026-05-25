@@ -44,9 +44,21 @@
 
 (defmethod get-editor-class ((self patchForLoop)) 'LoopEditor)
 
+#|
 (defmethod OpenEditorframe ((self patchForLoop))
    (or (editorframe self)
        (panel (open-new-RelationFrame  self (string+ "OM Loop - "(name self)) (get-elements self)))))
+|#
+
+(defmethod OpenEditorframe ((self patchForLoop))
+   (or (editorframe self)
+       (let ((panel (panel (open-new-RelationFrame self (string+ "OM Loop - "(name self)) (get-elements self)))))
+         (let ((z (w-zoom self)))
+           (when (and panel z (typep panel 'om-scroller) (not (= z 1.0)))
+             (setf (capi:capi-object-property panel :om-zoom-restoring-p) t)
+             (om-zoom-update panel z)
+             (setf (capi:capi-object-property panel :om-zoom-restoring-p) nil)))
+         panel)))
 
 (defmethod omng-remove-element ((self patchForLoop) (box OMIn))
   "When you remove an input from omloop 'self' (when copied from another one) you must update the loop boxe attached to 'self'."
@@ -251,22 +263,111 @@
 
 ; (defmethod add-input ((self looppanel) position) (call-next-method))
 
+(defmethod add-input ((self looppanel) position)
+  "On a loopPanel the top row hosts BOTH patch inputs and loop iterators.
+   Shift past iterators by the same 60-px stride used by om-loop-add-box,
+   so the two groups never overlap regardless of creation order."
+  (if position
+      (call-next-method)
+      (multiple-value-bind (sx sy vw vh) (om-zoom-viewport-logical self)
+        (declare (ignore vw vh))
+        (let* ((subs   (get-subframes self))
+               (num-in (length (list+ (find-class-boxes subs 'selfInFrame)
+                                      (find-class-boxes subs 'InFrame))))
+               (i-iter (length (remove-if-not
+                                #'(lambda (f) (typep (object f) 'loopIterators))
+                                subs)))
+               (pos    (om-make-point (+ sx 10 (* i-iter 60) (* num-in 50))
+                                      (+ sy 10))))
+          (call-next-method self pos)))))
 
+
+(defparameter *om-loop-iterator-refs*
+  '(forloop whileloop listloop onlistloop)
+  "Loop-iterator constructors hosted by the iterators block in the zoom bar.
+   Boxes built from these refs are placed along the TOP of the visible viewport,
+   matching the patch in-box placement.")
+
+(defparameter *om-loop-accumulator-refs*
+  '(counter sum minim maxi listing accumulator)
+  "Loop-accumulator constructors hosted by the accumulators block in the zoom bar.
+   Boxes built from these refs are placed along the BOTTOM of the visible viewport,
+   matching the patch out-box placement.")
+
+(defun om-loop-add-box (panel ref name)
+  "Add a new loop construct box of class REF to PANEL with default name NAME.
+   Placement rule:
+     REF in *om-loop-iterator-refs*    -> top of viewport (next to inputs).
+     REF in *om-loop-accumulator-refs* -> bottom of viewport (next to outputs).
+   In a normal patch inputs occupy the top row and outputs the bottom row,
+   so the panel never has two-row collisions. In a loopPanel iterators share
+   the top row with inputs and accumulators share the bottom row with outputs;
+   to avoid overlap the iterator x-offset starts AFTER the existing inputs
+   (and symmetrically for accumulators vs outputs)."
+  (multiple-value-bind (sx sy vw vh) (om-zoom-viewport-logical panel)
+    (declare (ignore vw))
+    (let* ((iter?     (member ref *om-loop-iterator-refs* :test 'eq))
+           (accum?    (member ref *om-loop-accumulator-refs* :test 'eq))
+           (subs      (get-subframes panel))
+           (num-in    (length (list+ (find-class-boxes subs 'selfInFrame)
+                                     (find-class-boxes subs 'InFrame))))
+           (num-out   (length (list+ (find-class-boxes subs 'tempOutFrame)
+                                     (find-class-boxes subs 'outFrame))))
+           (i-iter    (length (remove-if-not
+                               #'(lambda (f) (typep (object f) 'loopIterators))
+                               subs)))
+           (i-accum   (length (remove-if-not
+                               #'(lambda (f) (typep (object f) 'acumboxes))
+                               subs)))
+           (x         (cond
+                       (iter?  (+ sx 10 (* num-in  50) (* i-iter  60)))
+                       (accum? (+ sx 10 (* num-out 50) (* i-accum 60)))
+                       (t      (+ sx 20 (* (+ i-iter i-accum) 60)))))
+           (y         (cond
+                       (accum? (+ sy (max 10 (- vh 80))))
+                       (t      (+ sy 10))))
+           (pos       (om-make-point x y)))
+      (omG-add-element panel
+                       (let ((*make-frame-zoom-context*
+                              (and (typep panel 'om-scroller) (om-zoom-of panel))))
+                         (make-frame-from-callobj
+                          (omNG-make-new-boxcall (fdefinition ref)
+                                                 pos
+                                                 (mk-unique-name panel name))))))))
+
+(defun om-loop-make-button (class panel icon help ref name)
+  "Construct one loop construct button.
+   CLASS is 'om-icon-button (ICON is :icon1 string) or 'button-icon (ICON is :iconID int)."
+  (if (eq class 'om-icon-button)
+      (om-make-view 'om-icon-button
+                    :icon1 icon
+                    :size (om-make-point 24 24)
+                    :help-spec help
+                    :action #'(lambda (item) (declare (ignore item))
+                                (om-loop-add-box panel ref name)))
+      (om-make-view 'button-icon
+                    :iconID icon
+                    :size (om-make-point 24 24)
+                    :help-spec help
+                    :action #'(lambda (item) (declare (ignore item))
+                                (om-loop-add-box panel ref name)))))
+
+#|
 (defmethod add-window-buttons  ((self loopPanel))
    "Add iterator and accumulator buttons to the patch."
    (call-next-method)
-   
-   (om-add-subviews self 
-                    
+
+   (om-add-subviews self
+
                     (om-make-view 'om-icon-button
                         :icon1 "loop-for"
                         :position (om-make-point 95 5)
                         :size (om-make-point 24 24)
                         :help-spec "For i from A to B"
                         :action
-                        #'(lambda (item) (declare (ignore item)) 
+                        #'(lambda (item) (declare (ignore item))
                            (omG-add-element self
-                                            (make-frame-from-callobj 
+                                            (make-frame-from-callobj
                                              (omNG-make-new-boxcall (fdefinition 'forloop)
                                                                     (om-make-point 5 80)
                                                                     (mk-unique-name self "for"))))))
@@ -278,7 +379,7 @@
                                :action
                    #'(lambda(item)  (declare (ignore item))
                       (omG-add-element self
-                                       (make-frame-from-callobj 
+                                       (make-frame-from-callobj
                                         (omNG-make-new-boxcall (fdefinition 'whileloop)
                                                                (om-make-point 5 80)
                                                                (mk-unique-name self "while"))))))
@@ -288,9 +389,9 @@
                    :size (om-make-point 24 24)
                    :help-spec "For element in list"
                    :action
-                   #'(lambda(item) (declare (ignore item)) 
+                   #'(lambda(item) (declare (ignore item))
                       (omG-add-element self
-                                       (make-frame-from-callobj 
+                                       (make-frame-from-callobj
                                         (omNG-make-new-boxcall (fdefinition 'listloop)
                                                                (om-make-point 5 80)
                                                                (mk-unique-name self "inlist"))))))
@@ -300,22 +401,22 @@
                    :size (om-make-point 24 24)
                    :help-spec "For element on list"
                    :action
-                   #'(lambda(item) (declare (ignore item)) 
+                   #'(lambda(item) (declare (ignore item))
                       (omG-add-element self
-                                       (make-frame-from-callobj 
+                                       (make-frame-from-callobj
                                         (omNG-make-new-boxcall (fdefinition 'onlistloop)
                                                                (om-make-point 5 80)
                                                                (mk-unique-name self "onlist"))))))
-                 
+
                  (om-make-view 'button-icon
                    :iconID 175
                    :position (om-make-point 240 5)
                    :size (om-make-point 24 24)
                    :help-spec "Incremental counter"
                    :action
-                   #'(lambda(item) (declare (ignore item)) 
+                   #'(lambda(item) (declare (ignore item))
                       (omG-add-element self
-                                       (make-frame-from-callobj 
+                                       (make-frame-from-callobj
                                         (omNG-make-new-boxcall (fdefinition 'counter)
                                                                (om-make-point 5 80)
                                                                (mk-unique-name self "count"))))))
@@ -327,7 +428,7 @@
                    :action
                    #'(lambda(item)  (declare (ignore item))
                       (omG-add-element self
-                                       (make-frame-from-callobj 
+                                       (make-frame-from-callobj
                                         (omNG-make-new-boxcall (fdefinition 'sum)
                                                                (om-make-point 5 80)
                                                                (mk-unique-name self "sum"))))))
@@ -339,7 +440,7 @@
                    :action
                    #'(lambda(item)  (declare (ignore item))
                       (omG-add-element self
-                                       (make-frame-from-callobj 
+                                       (make-frame-from-callobj
                                         (omNG-make-new-boxcall (fdefinition 'minim)
                                                                (om-make-point 5 80)
                                                                (mk-unique-name self "min"))))))
@@ -351,7 +452,7 @@
                    :action
                    #'(lambda(item)  (declare (ignore item))
                       (omG-add-element self
-                                       (make-frame-from-callobj 
+                                       (make-frame-from-callobj
                                         (omNG-make-new-boxcall (fdefinition 'maxi)
                                                                (om-make-point 5 80)
                                                                (mk-unique-name self "max"))))))
@@ -363,7 +464,7 @@
                    :action
                    #'(lambda(item)  (declare (ignore item))
                       (omG-add-element self
-                                       (make-frame-from-callobj 
+                                       (make-frame-from-callobj
                                         (omNG-make-new-boxcall (fdefinition 'listing)
                                                                (om-make-point 5 80)
                                                                (mk-unique-name self "collect"))))))
@@ -375,88 +476,254 @@
                    :action
                    #'(lambda(item)  (declare (ignore item))
                       (omG-add-element self
-                                       (make-frame-from-callobj 
+                                       (make-frame-from-callobj
                                         (omNG-make-new-boxcall (fdefinition 'accumulator)
                                                                (om-make-point 5 80)
                                                                (mk-unique-name self "accum"))))))))
+|#
+
+(defmethod add-window-buttons ((self loopPanel))
+  "Add the loop toolbar (iterators + accumulators) into the editor's zoom bar."
+  (call-next-method)
+  (let* ((editor      (editor self))
+         (bar         (and editor (capi:capi-object-property editor :om-zoom-editor-bar)))
+         (iterators   '((om-icon-button "loop-for"    "For i from A to B"   forloop    "for")
+                        (om-icon-button "loop-while"  "While A"             whileloop  "while")
+                        (om-icon-button "loop-list"   "For element in list" listloop   "inlist")
+                        (om-icon-button "loop-onlist" "For element on list" onlistloop "onlist")))
+         (accumulators '((button-icon    175           "Incremental counter"  counter    "count")
+                         (button-icon    172           "Sum accumulator"      sum        "sum")
+                         (button-icon    174           "Minimize"             minim      "min")
+                         (button-icon    173           "Maximize"             maxi       "max")
+                         (button-icon    206           "Collect"              listing    "collect")
+                         (button-icon    171           "General accumulator"  accumulator "accum"))))
+    (flet ((mk (spec)
+             (om-loop-make-button (first spec) self (second spec) (third spec)
+                                  (fourth spec) (fifth spec))))
+      (when bar
+        ;; Three blocks in the zoom bar.
+        ;;   in/out + zoom widgets:   x = 5 .. ~155
+        ;;   gap ~30
+        ;;   iterators block (4 * 25):  x = 185 .. 284
+        ;;   gap ~25
+        ;;   accumulators block (6 * 25): x = 309 .. 458
+        (let ((host bar)
+              (y    1))
+          (let ((x 185))
+            (dolist (spec iterators)
+              (let ((b (mk spec)))
+                (om-set-view-position b (om-make-point x y))
+                (incf x 25)
+                (om-add-subviews host b))))
+          (let ((x 309))
+            (dolist (spec accumulators)
+              (let ((b (mk spec)))
+                (om-set-view-position b (om-make-point x y))
+                (incf x 25)
+                (om-add-subviews host b)))))))))
+
+#|
+;; Legacy panel layout matching openmusic-8.0:
+;;   in/out block: x = 5, 30 (ends at 54)
+;;   gap ~40
+;;   iterators block:    x = 95 .. 194
+;;   gap ~45
+;;   accumulators block: x = 240 .. 389
+(let ((host self)
+      (y    5))
+  (let ((x 95))
+    (dolist (spec iterators)
+      (let ((b (mk spec)))
+        (om-set-view-position b (om-make-point x y))
+        (incf x 25)
+        (om-add-subviews host b))))
+  (let ((x 240))
+    (dolist (spec accumulators)
+      (let ((b (mk spec)))
+        (om-set-view-position b (om-make-point x y))
+        (incf x 25)
+        (om-add-subviews host b)))))
+|#
 
 
       
+#|
 (defmethod om-get-menu-context ((self loopPanel))
    (let ((pos (om-mouse-position self)))
-         (append 
-          (list 
-           (list 
+         (append
+          (list
+           (list
             (om-make-menu "Iterators"
-                          (list 
+                          (list
                            (om-new-leafmenu "For" #'(lambda ()
                                                      (omG-add-element self
-                                                                      (make-frame-from-callobj 
+                                                                      (make-frame-from-callobj
                                                                        (omNG-make-new-boxcall (fdefinition 'forloop)
                                                                                               pos
                                                                                               (mk-unique-name self "for"))))))
 
-                            (om-new-leafmenu "While" #'(lambda () 
+                            (om-new-leafmenu "While" #'(lambda ()
                                                          (omG-add-element self
-                                                                          (make-frame-from-callobj 
+                                                                          (make-frame-from-callobj
                                                                            (omNG-make-new-boxcall (fdefinition 'whileloop)
                                                                                                   pos
                                                                                                   (mk-unique-name self "while"))))))
 
-                            (om-new-leafmenu "List Loop" #'(lambda () 
+                            (om-new-leafmenu "List Loop" #'(lambda ()
                                                          (omG-add-element self
-                                                                          (make-frame-from-callobj 
+                                                                          (make-frame-from-callobj
                                                                            (omNG-make-new-boxcall (fdefinition 'listloop)
                                                                                                   pos
                                                                                                   (mk-unique-name self "inlist"))))))
 
-                            (om-new-leafmenu "On List Loop" #'(lambda ()  
+                            (om-new-leafmenu "On List Loop" #'(lambda ()
                                                            (omG-add-element self
-                                                                            (make-frame-from-callobj 
+                                                                            (make-frame-from-callobj
                                                                              (omNG-make-new-boxcall (fdefinition 'onlistloop)
                                                                                                     pos
                                                                                                     (mk-unique-name self "onlist"))))))
-                          
+
                    ))
            (om-make-menu "Accumulators"
-                         (list 
-                          (om-new-leafmenu "Collect" #'(lambda () 
+                         (list
+                          (om-new-leafmenu "Collect" #'(lambda ()
                                                                (omG-add-element self
-                                                                                (make-frame-from-callobj 
+                                                                                (make-frame-from-callobj
                                                                                  (omNG-make-new-boxcall (fdefinition 'listing)
                                                                                                         pos
                                                                                                         (mk-unique-name self "collect"))))))
-                          (om-new-leafmenu "Sum" #'(lambda () 
+                          (om-new-leafmenu "Sum" #'(lambda ()
                                                      (omG-add-element self
-                                                                      (make-frame-from-callobj 
+                                                                      (make-frame-from-callobj
                                                                        (omNG-make-new-boxcall (fdefinition 'sum)
                                                                                               pos
                                                                                               (mk-unique-name self "sum"))))))
-                          (om-new-leafmenu "Count" #'(lambda () 
+                          (om-new-leafmenu "Count" #'(lambda ()
                                                        (omG-add-element self
-                                                                        (make-frame-from-callobj 
+                                                                        (make-frame-from-callobj
                                                                          (omNG-make-new-boxcall (fdefinition 'counter)
                                                                                                 pos
                                                                                                 (mk-unique-name self "count"))))))
-                          (om-new-leafmenu "Min" #'(lambda () 
+                          (om-new-leafmenu "Min" #'(lambda ()
                                                      (omG-add-element self
-                                                                      (make-frame-from-callobj 
+                                                                      (make-frame-from-callobj
                                                                        (omNG-make-new-boxcall (fdefinition 'minim)
                                                                                               pos
                                                                                               (mk-unique-name self "min"))))))
-                          (om-new-leafmenu "Max" #'(lambda () 
+                          (om-new-leafmenu "Max" #'(lambda ()
                                                      (omG-add-element self
-                                                                      (make-frame-from-callobj 
+                                                                      (make-frame-from-callobj
                                                                        (omNG-make-new-boxcall (fdefinition 'maxi)
                                                                                               pos
                                                                                               (mk-unique-name self "max"))))))
-                          (om-new-leafmenu "General Accum." #'(lambda () 
+                          (om-new-leafmenu "General Accum." #'(lambda ()
                                                                (omG-add-element self
-                                                                                (make-frame-from-callobj 
+                                                                                (make-frame-from-callobj
                                                                                  (omNG-make-new-boxcall (fdefinition 'accumulator)
                                                                                                         pos
                                                                                                         (mk-unique-name self "accum"))))))
-                          
+
+                          ))
+           ))
+          (call-next-method))
+         ))
+|#
+
+(defmethod om-get-menu-context ((self loopPanel))
+   (let ((pos (om-mouse-position self)))
+         (append
+          (list
+           (list
+            (om-make-menu "Iterators"
+                          (list
+                           (om-new-leafmenu "For" #'(lambda ()
+                                                     (omG-add-element self
+                                                                      (let ((*make-frame-zoom-context*
+                                                                             (and (typep self 'om-scroller) (om-zoom-of self))))
+                                                                        (make-frame-from-callobj
+                                                                         (omNG-make-new-boxcall (fdefinition 'forloop)
+                                                                                                pos
+                                                                                                (mk-unique-name self "for")))))))
+
+                            (om-new-leafmenu "While" #'(lambda ()
+                                                         (omG-add-element self
+                                                                          (let ((*make-frame-zoom-context*
+                                                                                 (and (typep self 'om-scroller) (om-zoom-of self))))
+                                                                            (make-frame-from-callobj
+                                                                             (omNG-make-new-boxcall (fdefinition 'whileloop)
+                                                                                                    pos
+                                                                                                    (mk-unique-name self "while")))))))
+
+                            (om-new-leafmenu "List Loop" #'(lambda ()
+                                                         (omG-add-element self
+                                                                          (let ((*make-frame-zoom-context*
+                                                                                 (and (typep self 'om-scroller) (om-zoom-of self))))
+                                                                            (make-frame-from-callobj
+                                                                             (omNG-make-new-boxcall (fdefinition 'listloop)
+                                                                                                    pos
+                                                                                                    (mk-unique-name self "inlist")))))))
+
+                            (om-new-leafmenu "On List Loop" #'(lambda ()
+                                                           (omG-add-element self
+                                                                            (let ((*make-frame-zoom-context*
+                                                                                   (and (typep self 'om-scroller) (om-zoom-of self))))
+                                                                              (make-frame-from-callobj
+                                                                               (omNG-make-new-boxcall (fdefinition 'onlistloop)
+                                                                                                      pos
+                                                                                                      (mk-unique-name self "onlist")))))))
+
+                   ))
+           (om-make-menu "Accumulators"
+                         (list
+                          (om-new-leafmenu "Collect" #'(lambda ()
+                                                               (omG-add-element self
+                                                                                (let ((*make-frame-zoom-context*
+                                                                                       (and (typep self 'om-scroller) (om-zoom-of self))))
+                                                                                  (make-frame-from-callobj
+                                                                                   (omNG-make-new-boxcall (fdefinition 'listing)
+                                                                                                          pos
+                                                                                                          (mk-unique-name self "collect")))))))
+                          (om-new-leafmenu "Sum" #'(lambda ()
+                                                     (omG-add-element self
+                                                                      (let ((*make-frame-zoom-context*
+                                                                             (and (typep self 'om-scroller) (om-zoom-of self))))
+                                                                        (make-frame-from-callobj
+                                                                         (omNG-make-new-boxcall (fdefinition 'sum)
+                                                                                                pos
+                                                                                                (mk-unique-name self "sum")))))))
+                          (om-new-leafmenu "Count" #'(lambda ()
+                                                       (omG-add-element self
+                                                                        (let ((*make-frame-zoom-context*
+                                                                               (and (typep self 'om-scroller) (om-zoom-of self))))
+                                                                          (make-frame-from-callobj
+                                                                           (omNG-make-new-boxcall (fdefinition 'counter)
+                                                                                                  pos
+                                                                                                  (mk-unique-name self "count")))))))
+                          (om-new-leafmenu "Min" #'(lambda ()
+                                                     (omG-add-element self
+                                                                      (let ((*make-frame-zoom-context*
+                                                                             (and (typep self 'om-scroller) (om-zoom-of self))))
+                                                                        (make-frame-from-callobj
+                                                                         (omNG-make-new-boxcall (fdefinition 'minim)
+                                                                                                pos
+                                                                                                (mk-unique-name self "min")))))))
+                          (om-new-leafmenu "Max" #'(lambda ()
+                                                     (omG-add-element self
+                                                                      (let ((*make-frame-zoom-context*
+                                                                             (and (typep self 'om-scroller) (om-zoom-of self))))
+                                                                        (make-frame-from-callobj
+                                                                         (omNG-make-new-boxcall (fdefinition 'maxi)
+                                                                                                pos
+                                                                                                (mk-unique-name self "max")))))))
+                          (om-new-leafmenu "General Accum." #'(lambda ()
+                                                               (omG-add-element self
+                                                                                (let ((*make-frame-zoom-context*
+                                                                                       (and (typep self 'om-scroller) (om-zoom-of self))))
+                                                                                  (make-frame-from-callobj
+                                                                                   (omNG-make-new-boxcall (fdefinition 'accumulator)
+                                                                                                          pos
+                                                                                                          (mk-unique-name self "accum")))))))
+
                           ))
            ))
           (call-next-method))

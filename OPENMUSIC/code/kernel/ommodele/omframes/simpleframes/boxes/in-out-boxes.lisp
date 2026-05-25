@@ -74,13 +74,31 @@
        (make-basic-output self module)
        (make-outputs-from-names self (defval self) module)))
         
-(defmethod make-basic-output ((self t) module) 
+#|
+(defmethod make-basic-output ((self t) module)
    (let ((thenewout (om-make-view (get-out-class self)
-                      :position (om-make-point (- (round (w module) 2) 4) 
+                      :position (om-make-point (- (round (w module) 2) 4)
                                                  (- (h module) 9))
                       :size (om-make-point 8 8)
                       :help-spec "Basic Type input"
                       :index 0)))
+     (push thenewout (outframes module))
+     (om-add-subviews module thenewout)))
+|#
+
+;;; (w module) / (h module) are already VISUAL.
+(defmethod make-basic-output ((self t) module)
+   (let* ((zoom    (or *make-frame-zoom-context* 1.0))
+          (scale-p (and (numberp zoom) (/= zoom 1.0)))
+          (io-size (if scale-p (max 1 (round (* 8 zoom))) 8))
+          (off-x   (if scale-p (round (* 4 zoom)) 4))
+          (off-y   (if scale-p (round (* 9 zoom)) 9))
+          (thenewout (om-make-view (get-out-class self)
+                       :position (om-make-point (- (round (w module) 2) off-x)
+                                                  (- (h module) off-y))
+                       :size (om-make-point io-size io-size)
+                       :help-spec "Basic Type input"
+                       :index 0)))
      (push thenewout (outframes module))
      (om-add-subviews module thenewout)))
 
@@ -200,9 +218,11 @@
      (let* ((obj (object self))
             (container (om-view-container self))
             (newin (make-new-typed-input (name obj) thetype (indice obj) (frame-position obj)))
-            (frame (make-frame-from-callobj newin)))
-       (when (active-mode self) 
-         (omG-unselect self)) 
+            (frame (let ((*make-frame-zoom-context*
+                          (and (typep container 'om-scroller) (om-zoom-of container))))
+                     (make-frame-from-callobj newin))))
+       (when (active-mode self)
+         (omG-unselect self))
        (setf (indice (object self)) nil)
        (omg-remove-element container self)
        (real-make-delete-before container (list self))
@@ -223,13 +243,24 @@
      (om-beep-msg "You can not modify the inputs of a function already defined")))
 
 
+#|
 (defmethod draw-typed-special ((self typedinframe))
   (om-with-focused-view self
     (om-with-font *om-default-font1*
                   ;(om-draw-rect-outline 0 9 (w self) (- (h self) 28))
-                  (om-draw-string (- (round (w self) 2) 4) 8 
+                  (om-draw-string (- (round (w self) 2) 4) 8
                                   (format () "~D" (indice (object self))))))
   )
+|#
+
+(defmethod draw-typed-special ((self typedinframe))
+  (let* ((zoom (om-zoom-effective self))
+         (offx (round (* 4 zoom)))
+         (offy (round (* 8 zoom))))
+    (om-with-focused-view self
+      (om-with-font (om-current-default-font1 self)
+                    (om-draw-string (- (round (w self) 2) offx) offy
+                                    (format () "~D" (indice (object self))))))))
 
 (defmethod om-draw-contents ((self TypedInFrame))
   (call-next-method)
@@ -240,13 +271,17 @@
    (if (om-shift-key-p)
      (let* ((target (om-view-container self)) newobj)
        (when (and target (find-class (reference (object self)) nil) (omclass-p  (find-class (reference (object self)) nil)))
-         (setf newobj (omNG-make-new-boxcall-slots 
-                       (find-class (reference (object self)))  
+         (setf newobj (omNG-make-new-boxcall-slots
+                       (find-class (reference (object self)))
                        (borne-position new-position) (mk-unique-name target "slot")))
-         (omG-add-element target (make-frame-from-callobj newobj))))
+         (omG-add-element target
+                          (let ((*make-frame-zoom-context*
+                                 (and (typep target 'om-scroller) (om-zoom-of target))))
+                            (make-frame-from-callobj newobj)))))
      (call-next-method)))
 
 
+#|
 (defmethod move-frame-delta ((self TypedInFrame) dir)
    (let ((pixnum (if (om-shift-key-p) 10 1)) new-position)
      (setf new-position
@@ -259,6 +294,21 @@
                  (draw-connection conection nil)) (connections self))
        (om-set-view-position self new-position)
        (setf (frame-position (object self)) new-position)))
+|#
+
+(defmethod move-frame-delta ((self TypedInFrame) dir)
+   (let* ((pixnum (if (om-shift-key-p) 10 1))
+          (pos    (or (and (object self) (frame-position (object self)))
+                      (om-view-position self)))
+          (new-position
+           (case dir
+             (0 (om-subtract-points pos (om-make-point 0 pixnum)))
+             (1 (om-add-points      pos (om-make-point 0 pixnum)))
+             (2 (om-add-points      pos (om-make-point pixnum 0)))
+             (3 (om-subtract-points pos (om-make-point pixnum 0))))))
+     (mapc #'(lambda (conection)
+               (draw-connection conection nil)) (connections self))
+     (om-set-view-position self new-position)))
   
 
 (defun check-method-arg-name (name panel)
@@ -375,7 +425,7 @@
     (setf (defval tempin) (car (attached-objs patch)))))
 
 ;;; on fait ca au moment ou on ajoute le selfinframe
-;;; i.e. quand on ouvre le patch ou quand on la crŽe manuellement ("tempin")
+;;; i.e. quand on ouvre le patch ou quand on la crï¿½e manuellement ("tempin")
 (defmethod add-subview-extra ((self selfInFrame))
   (call-next-method)
   (let ((patch (object (om-view-container self))))
@@ -616,11 +666,22 @@
       (draw-in-inout-box self (object container))
       )))
 
+#|
 (defmethod draw-in-inout-box ((container t) object)
   (om-with-focused-view container
     (om-with-font *om-default-font1b*
                   (om-draw-string (- (round (w container) 2) 7) 12 (format () "~2D" (indice object))))
     ))
+|#
+
+(defmethod draw-in-inout-box ((container t) object)
+  (let* ((zoom (om-zoom-effective container))
+         (offx (round (* 7 zoom)))
+         (offy (round (* 12 zoom))))
+    (om-with-focused-view container
+      (om-with-font (om-current-default-font1b container)
+                    (om-draw-string (- (round (w container) 2) offx) offy
+                                    (format () "~2D" (indice object)))))))
   
 ;------------------------------------------
 ;SPECIAL I/O for maquette patches

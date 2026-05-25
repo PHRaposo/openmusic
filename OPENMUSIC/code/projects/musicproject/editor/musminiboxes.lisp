@@ -194,13 +194,26 @@
 (defmethod draw-mini-view ((self t) (value score-element))
   (score-draw-mini-view self value))
 
-;;; no minipict for score objects 
+;;; no minipict for score objects
+#|
 (defmethod score-draw-mini-view ((self t) value)
    (if (minipict self) ;; => always NIL
      (let ((x0 (initx self)) (y0 (inity self)) (pictsize (om-get-picture-size (minipict self))))
        (om-draw-picture self (minipict self) :pos (om-make-point x0 y0) :size pictsize))
    (om-with-focused-view self
      (draw-mini-obj value self (mv-font-size value) (mv-view-size value self)))))
+|#
+
+(defmethod score-draw-mini-view ((self t) value)
+  (let* ((zoom (om-zoom-find-ancestor-zoom self))
+         (*miniview-font-size* (if (and (numberp zoom) (/= zoom 1.0))
+                                   (max 1 (round (* *miniview-font-size* zoom)))
+                                 *miniview-font-size*)))
+    (if (minipict self) ;; => always NIL
+        (let ((x0 (initx self)) (y0 (inity self)) (pictsize (om-get-picture-size (minipict self))))
+          (om-draw-picture self (minipict self) :pos (om-make-point x0 y0) :size pictsize))
+      (om-with-focused-view self
+        (draw-mini-obj value self (mv-font-size value) (mv-view-size value self))))))
 
 (defmethod update-miniview ((self t) (value simple-score-element)) 
   (score-update-miniview self value))
@@ -208,11 +221,33 @@
 (defmethod update-miniview ((self t) (value score-element)) 
   (score-update-miniview self value))
 
+#|
 (defmethod score-update-miniview ((self t) value)
   (when (minipict self) (om-kill-picture (minipict self)) (setf (minipict self) nil))
   (if (and (not (equal (type-of value) 'midifile))
            (not (equal (type-of value) 'eventmidi-seq)))
       (setf (minipict self)  (cons-mini-pict value self (mv-font-size value) (mv-view-size value self))))
+  (om-invalidate-view self t))
+|#
+
+(defmethod score-update-miniview ((self t) value)
+  (when (minipict self) (om-kill-picture (minipict self)) (setf (minipict self) nil))
+  (if (and (not (equal (type-of value) 'midifile))
+           (not (equal (type-of value) 'eventmidi-seq)))
+      (let* ((zoom (om-zoom-find-ancestor-zoom self))
+             (*miniview-font-size* (if (and (numberp zoom) (/= zoom 1.0))
+                                       (max 1 (round (* *miniview-font-size* zoom)))
+                                     *miniview-font-size*)))
+        (setf (minipict self) (cons-mini-pict value self (mv-font-size value) (mv-view-size value self)))))
+  (om-invalidate-view self t))
+
+(defmethod score-update-miniview ((self tempobjframe) value)
+  (when (minipict self) (om-kill-picture (minipict self)) (setf (minipict self) nil))
+  (if (and (not (equal (type-of value) 'midifile))
+           (not (equal (type-of value) 'eventmidi-seq)))
+      (let* ((zoom (om-zoom-of self))
+             (fs   (max 1 (round (* (mv-font-size value) zoom)))))
+        (setf (minipict self) (cons-mini-pict value self fs (mv-view-size value self)))))
   (om-invalidate-view self t))
 
 ;;; when drawing must fit in a given rectangle
@@ -222,11 +257,23 @@
 (defmethod draw-obj-in-rect ((self  score-element) x x1 y y1 edparams  view)
   (score-draw-obj-in-rect self x x1 y y1 edparams view))
 
+#|
 (defmethod score-draw-obj-in-rect (self x x1 y y1 edparams  view)
   (let* ((size (om-make-point (- x1 x) (- y1 y)))
          (thepict (cons-mini-pict self view (mv-font-size view) size)))
      (om-draw-picture view thepict :pos (om-make-point x y) :size size)
      (om-kill-picture thepict) t))
+|#
+
+(defmethod score-draw-obj-in-rect (self x x1 y y1 edparams  view)
+  (let* ((zoom (om-zoom-find-ancestor-zoom view))
+         (*miniview-font-size* (if (and (numberp zoom) (/= zoom 1.0))
+                                   (max 1 (round (* *miniview-font-size* zoom)))
+                                 *miniview-font-size*))
+         (size (om-make-point (- x1 x) (- y1 y)))
+         (thepict (cons-mini-pict self view (mv-font-size view) size)))
+    (om-draw-picture view thepict :pos (om-make-point x y) :size size)
+    (om-kill-picture thepict) t))
 
 ;exceptions por ahora
 
@@ -323,11 +370,24 @@
 (defmethod draw-object-mini-obj ((self multi-seq) view grapobj staffsys sizefont size deltay) 
   (draw-multi-mini-obj self view grapobj staffsys sizefont size deltay))
 
+#|
 (defmethod update-miniview ((self t) (value multi-seq))
    (when (minipict self) (om-kill-picture (minipict self))
          (setf (minipict self) nil))
-   (set-mini-param self 'staff (correct-staff-val value (get-mini-param self 'staff) self)) 
+   (set-mini-param self 'staff (correct-staff-val value (get-mini-param self 'staff) self))
    (setf (minipict self)  (cons-mini-pict value self (mv-font-size value) (mv-view-size value self)))
+   (om-invalidate-view self t))
+|#
+
+(defmethod update-miniview ((self t) (value multi-seq))
+   (when (minipict self) (om-kill-picture (minipict self))
+         (setf (minipict self) nil))
+   (set-mini-param self 'staff (correct-staff-val value (get-mini-param self 'staff) self))
+   (let* ((zoom (om-zoom-find-ancestor-zoom self))
+          (*miniview-font-size* (if (and (numberp zoom) (/= zoom 1.0))
+                                    (max 1 (round (* *miniview-font-size* zoom)))
+                                  *miniview-font-size*)))
+     (setf (minipict self) (cons-mini-pict value self (mv-font-size value) (mv-view-size value self))))
    (om-invalidate-view self t))
 
 

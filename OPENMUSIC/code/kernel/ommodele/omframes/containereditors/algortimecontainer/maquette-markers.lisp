@@ -168,10 +168,11 @@ boxes attached to the flag, the car of each element say if the box is attached a
      (setf (frame-position rep) (borne-position posi))
      rep))
 
+#|
 (defmethod make-frame-from-callobj ((self temp-marker))
    "Cons a simple frame for a temp-marker instance."
-   (let* ((module (om-make-view 'markerframe 
-                                 :position (frame-position self) 
+   (let* ((module (om-make-view 'markerframe
+                                 :position (frame-position self)
                                  :size  (om-make-point 8 10)
                                  :object self)))
      (om-add-subviews module (setf (iconView module)
@@ -179,6 +180,32 @@ boxes attached to the flag, the car of each element say if the box is attached a
                                               :iconID (icon self)
                                               :help-spec (name self)
                                               :size (om-make-point 8 10)
+                                              :position (om-make-point 0 0))))
+     (setf (name module) (name self))
+     (setf (frames self) (list module))
+     module))
+|#
+
+;;; LOGICAL geometry on the OBJECT (frame-position) is unchanged.
+(defmethod make-frame-from-callobj ((self temp-marker))
+   "Cons a simple frame for a temp-marker instance."
+   (let* ((zoom (or *make-frame-zoom-context* 1.0))
+          (scale-p (and (numberp zoom) (/= zoom 1.0)))
+          (logical-size (om-make-point 8 10))
+          (logical-pos  (frame-position self))
+          (module-vsize (if scale-p (om-zoom-scale-point logical-size zoom) logical-size))
+          (module-vpos  (if (and scale-p logical-pos)
+                            (om-zoom-scale-point logical-pos zoom)
+                            logical-pos))
+          (module (om-make-view 'markerframe
+                                 :position module-vpos
+                                 :size  module-vsize
+                                 :object self)))
+     (om-add-subviews module (setf (iconView module)
+                                (om-make-view 'bandera
+                                              :iconID (icon self)
+                                              :help-spec (name self)
+                                              :size module-vsize
                                               :position (om-make-point 0 0))))
      (setf (name module) (name self))
      (setf (frames self) (list module))

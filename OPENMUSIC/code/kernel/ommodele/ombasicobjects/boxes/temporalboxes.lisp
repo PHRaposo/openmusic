@@ -133,6 +133,7 @@ A TemporalBox is supposed to yield a musical result to integrate in a temporal c
 (defmethod do-delete-one-keyword ((self TemporalBox)) (om-beep))
 
 
+#|
 (defmethod make-frame-from-callobj ((self TemporalBox))
   (let* ((numouts (numouts self))
           (numins (length (inputs self)))
@@ -146,7 +147,7 @@ A TemporalBox is supposed to yield a musical result to integrate in a temporal c
      (unless (zerop numouts)
        (if (ominstance-p (reference self))
          (setf outsname (list "self"))
-         (setf outsname (loop for item in (sort (find-class-boxes (boxes (reference self)) 'OMout) '< :key 'indice) 
+         (setf outsname (loop for item in (sort (find-class-boxes (boxes (reference self)) 'OMout) '< :key 'indice)
                               collect (get-frame-name item))))
        (loop for i from 0 to (- numouts 1) do
              (let ((thenewout (om-make-view (get-out-class self)
@@ -163,6 +164,51 @@ A TemporalBox is supposed to yield a musical result to integrate in a temporal c
                              :help-spec (string+ "<" (string-downcase (name input))
                                                  "> " (doc-string input))
                              :size (om-make-point 8 8)
+                             :position (om-make-point 0 0))))
+             (setf (inputframes module) (list+ (inputframes module) (list newinput)))
+             (om-add-subviews module newinput)))
+     (setf (iconview module) (pictu self))
+     (setf (name module) (name self))
+     (setf (frames self) (list module))
+     (when (allow-lock self)
+       (add-lock-button module (allow-lock self)))
+     (add-box-resize module)
+     module))
+|#
+
+(defmethod make-frame-from-callobj ((self TemporalBox))
+  (let* ((numouts (numouts self))
+         (numins (length (inputs self)))
+         outsname  module
+         (zoom (or *make-frame-zoom-context* 1.0))
+         (scale-p (and (numberp zoom) (/= zoom 1.0)))
+         (io-side-v (if scale-p (max 1 (round (* 8 zoom))) 8)))
+     (setq module
+           (om-make-view (get-frame-class self)
+             :position (om-make-point 0 0)
+             :help-spec ""
+             :size  (om-make-point 0 0)
+             :object self))
+     (unless (zerop numouts)
+       (if (ominstance-p (reference self))
+         (setf outsname (list "self"))
+         (setf outsname (loop for item in (sort (find-class-boxes (boxes (reference self)) 'OMout) '< :key 'indice)
+                              collect (get-frame-name item))))
+       (loop for i from 0 to (- numouts 1) do
+             (let ((thenewout (om-make-view (get-out-class self)
+                                :position (om-make-point 0 0)
+                                :size (om-make-point io-side-v io-side-v)
+                                :help-spec (nth i outsname)
+                                :index i)))
+               (setf (outframes module) (list+ (outframes module) (list thenewout)))
+               (om-add-subviews module thenewout))))
+     (loop for input in (inputs self)
+           for i from 0 to (- numins 1) do
+           (let ((newinput (om-make-view (get-input-class-frame self)
+                             :object input
+                             :help-spec (string+ "<" (string-downcase (name input))
+                                                 "> " (doc-string input))
+                             :size (om-make-point io-side-v io-side-v)
                              :position (om-make-point 0 0))))
              (setf (inputframes module) (list+ (inputframes module) (list newinput)))
              (om-add-subviews module newinput)))
@@ -536,10 +582,16 @@ A TemporalBox is supposed to yield a musical result to integrate in a temporal c
       (let ((container (om-view-container (car (frames self)))))
         (real-make-delete-before container (frames self))
         (omg-remove-element container (car (frames self)))
-        
+
+        #|
         (omG-add-element container
                          (make-frame-from-callobj tempobj))
-        
+        |#
+        (omG-add-element container
+                         (let ((*make-frame-zoom-context*
+                                (and (typep container 'om-scroller) (om-zoom-of container))))
+                           (make-frame-from-callobj tempobj)))
+
         ))
     tempobj))
 

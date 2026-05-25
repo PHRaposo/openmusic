@@ -266,6 +266,11 @@ In this case, all internal events are sent simultaneously.
 
 (defmethod get-panel-class ((Self FLUIDChannelsEditor)) 'FluidChannelsPanel)
 (defclass FluidChannelsPanel (FluidChannelcontrollerPanel om-scroller) ())
+
+(defmethod om-zoom-touch-update ((pane FluidChannelsPanel) scale anchor-x anchor-y)
+  (declare (ignore scale anchor-x anchor-y))
+  nil)
+
 (defmethod get-channelpanel-class ((self FluidChannelsPanel)) 'fluidchannelsview)
 (defclass fluidchannelsview (fluid-chan-panelview) ())
 

@@ -768,7 +768,11 @@ In order to remove the previous TemporalBoxes, consider using the functions Remo
    (let ((newbox (clone self)))
      (if (not (editorframe maquette))
          (omng-add-element maquette newbox)
-       (omg-add-element (editorframe maquette) (make-frame-from-callobj newbox)))
+       (let ((ef (editorframe maquette)))
+         (omg-add-element ef
+                          (let ((*make-frame-zoom-context*
+                                 (and (typep ef 'om-scroller) (om-zoom-of ef))))
+                            (make-frame-from-callobj newbox)))))
      self))
 
 (defmethod* addBox2Maquette ((self list) (maquette ommaquette))
@@ -982,7 +986,11 @@ Note : the EVAL-FUNC can also be attached in a Maquette by dragging the patch or
   :doc "put in the maquette"
   (if (not (editorframe maquette))
     (omng-add-element maquette self)
-    (omg-add-element (editorframe maquette) (make-frame-from-callobj self)))
+    (let ((ef (editorframe maquette)))
+      (omg-add-element ef
+                       (let ((*make-frame-zoom-context*
+                              (and (typep ef 'om-scroller) (om-zoom-of ef))))
+                         (make-frame-from-callobj self)))))
   self)
 
 (defmethod* objfree-store ((self temporalbox) &optional control)

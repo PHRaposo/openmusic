@@ -284,11 +284,40 @@ Elements of methodPanels are instaces of the boxframe class.#enddoc#
 ;INITS
 ;--------------------------------------------------
 
-;; once a genfun is defined, no inputs/outputs can be added !
+;; Panel-level IO buttons are suppressed; the generic-function zoom bar
+;; (see OM-ZOOM-EDITOR-BAR-BUILD methodEditor below) hosts them instead.
 (defmethod add-window-buttons ((self methodPanel)) nil)
 
+#|
 (defmethod add-output-enabled ((self methodPanel) type) nil)
 (defmethod add-input-enabled ((self methodPanel) type) nil)
+|#
+
+(defmethod add-output-enabled ((self methodPanel) type) t)
+(defmethod add-input-enabled  ((self methodPanel) type) t)
+
+;; Generic-function methods take TYPED inputs; route ADD-INPUT through
+;; MAKE-NEW-TYPED-INPUT so the generic zoom-bar IN button (and any other
+;; caller) yields a typed-input by default.
+(defmethod add-input ((self methodPanel) position)
+  (when (add-input-enabled self 'in)
+    (let* ((boxes (get-subframes self))
+           (i     (length (find-class-boxes boxes 'TypedInFrame))))
+      (multiple-value-bind (sx sy vw vh) (om-zoom-viewport-logical self)
+        (declare (ignore vw vh))
+        (let ((pos (or position
+                       (om-make-point (+ sx 10 (* i 50))
+                                      (+ sy 10)))))
+          (omG-add-element self
+                           (let ((*make-frame-zoom-context*
+                                  (and (typep self 'om-scroller) (om-zoom-of self))))
+                             (make-frame-from-callobj
+                              (make-new-typed-input
+                               (unique-name-from-list-new
+                                "input" (get-elements (object self)) :mode :num :space nil)
+                               't (+ i 1) pos))))
+          (set-field-size self)
+          t)))))
 
 
 ;;; DROP ON INPUT BUTTON --> CREATE TYPED INPUT
@@ -297,17 +326,32 @@ Elements of methodPanels are instaces of the boxframe class.#enddoc#
 
 (defmethod do-default-action ((self input-maker) icon)
   (let* ((thescroller (om-view-container icon))
-         (boxes (get-subframes thescroller)) 
+         (boxes (get-subframes thescroller))
          (i (length (find-class-boxes boxes 'TypedInFrame)))
          (pos (om-make-point (+ 5 (* i 50)) 45)))
     (omG-add-element thescroller
-                     (make-frame-from-callobj 
-                      (make-new-typed-input (unique-name-from-list-new "input" (get-elements (object thescroller)) :mode :num :space nil)
-                                            't (+ i 1) pos)))))
+                     (let ((*make-frame-zoom-context*
+                            (and (typep thescroller 'om-scroller) (om-zoom-of thescroller))))
+                       (make-frame-from-callobj
+                        (make-new-typed-input (unique-name-from-list-new "input" (get-elements (object thescroller)) :mode :num :space nil)
+                                              't (+ i 1) pos))))))
 
 
 ;;; SPECIAL CLASS
 (defclass typed-input-button (unaire-fun-view om-icon-button) ())
+
+;; Variant used by the methodEditor zoom bar: holds an explicit reference
+;; to the target methodPanel so PERFORM-DROP can locate the panel where
+;; the typed input should be added. Vanilla typed-input-button relies on
+;; (om-view-container target) returning the panel, which is only true
+;; when the button is a direct child of the panel.
+(defclass methodEditor-input-button (typed-input-button)
+  ((target-panel :initform nil :initarg :target-panel :accessor target-panel)))
+
+;; PERFORM-DROP methods for methodEditor-input-button live in
+;; kernel/graphics/dragdrop/performdrop.lisp, alongside the analogous
+;; methods for typed-input-button — that file is loaded after OMDRAG-DROP
+;; is defined.
 
 
 (defun make-typed-input-from-obj (object panel &optional value)
@@ -318,20 +362,24 @@ Elements of methodPanels are instaces of the boxframe class.#enddoc#
          (new-input (make-new-typed-input (unique-name-from-list-new "input" (get-elements (object panel)) :mode :num :space nil)
                                           thetype (+ i 1) pos)))
     (when value (setf (defval new-input) (clone value)))
-    (omG-add-element panel (make-frame-from-callobj new-input))
+    (omG-add-element panel
+                     (let ((*make-frame-zoom-context*
+                            (and (typep panel 'om-scroller) (om-zoom-of panel))))
+                       (make-frame-from-callobj new-input)))
     t))
     
 
 
+#|
 (defmethod newgenfun-add-window-buttons ((self methodPanel))
-  (om-add-subviews self 
+  (om-add-subviews self
                    (om-make-view 'typed-input-button
                                  :object (make-instance 'input-maker)
                                  :icon1 "in"
                                  :icon2 "in-pushed"
                                  :position (om-make-point 30 5)
                                  :size (om-make-point 24 24)
-                                 :drop-action #'(lambda (item) 
+                                 :drop-action #'(lambda (item)
                                                   (make-typed-input-from-obj (object item) self)))
                    (om-make-view 'om-icon-button
                                  :icon1 "out"
@@ -340,16 +388,88 @@ Elements of methodPanels are instaces of the boxframe class.#enddoc#
                                  :size (om-make-point 24 24)
                                  :action
                                  #'(lambda(item) (declare (ignore item))
-                                     (let* ((boxes (get-subframes self)) 
+                                     (let* ((boxes (get-subframes self))
                                             (i (- (length (find-class-boxes boxes 'outFrame)) 1))
                                             (pos (om-make-point (+ 5 (* (+ 1 i) 50)) 240)))
                                        (omG-add-element self
-                                                        (make-frame-from-callobj 
-                                                         (make-new-output (mk-unique-name self "output")
-                                                                          (+ i 1) pos)))
+                                                        (let ((*make-frame-zoom-context*
+                                                               (and (typep self 'om-scroller) (om-zoom-of self))))
+                                                          (make-frame-from-callobj
+                                                           (make-new-output (mk-unique-name self "output")
+                                                                            (+ i 1) pos))))
                                        (set-field-size self)
                                        )))
                    ))
+
+;; Above: panel-level buttons moved to the GENERIC-FUNCTION-ZOOM-BAR
+;; built by OM-ZOOM-EDITOR-BAR-BUILD methodEditor (defined below).
+|#
+
+(defmethod om-zoom-editor-bar-build ((editor methodEditor))
+  "Generic-function zoom bar: same widgets as the default patch bar, but the
+   IN button is a TYPED-INPUT-BUTTON whose DROP-ACTION creates a typed input
+   matching the dropped object's class (click still adds a generic typed input
+   via ADD-INPUT methodPanel)."
+  (let* ((panel (panel editor))
+         (zoom  (if (typep panel 'om-scroller) (om-zoom-of panel) 1.0))
+         (pct   (round (* zoom 100)))
+         (bar (om-make-view 'generic-function-zoom-bar
+                            :position (om-make-point 0 0)
+                            :size (om-make-point (w editor) +om-zoom-bar-h+)
+                            :bg-color *controls-color*))
+         (out-btn (om-make-view
+                   'om-icon-button
+                   :position (om-make-point 5 1)
+                   :size (om-make-point 24 24)
+                   :icon1 "out"
+                   :icon2 "out-pushed"
+                   :action #'(lambda (item)
+                               (declare (ignore item))
+                               (modify-patch panel)
+                               (add-output panel nil))))
+         (in-btn (om-make-view
+                  'methodEditor-input-button
+                  :object (make-instance 'input-maker)
+                  :target-panel panel
+                  :position (om-make-point 30 1)
+                  :size (om-make-point 24 24)
+                  :icon1 "in"
+                  :icon2 "in-pushed"
+                  :action #'(lambda (item)
+                              (declare (ignore item))
+                              (modify-patch panel)
+                              (add-input panel nil))))
+         (zoom-bg (om-make-dialog-item
+                   'om-static-text
+                   (om-make-point 60 1)
+                   (om-make-point 95 24)
+                   ""
+                   :font *om-default-font1*
+                   :bg-color *controls-color*))
+         (zoom-label (om-make-dialog-item
+                      'om-static-text
+                      (om-make-point 65 4)
+                      (om-make-point 35 18)
+                      "Zoom"
+                      :font *om-default-font1*
+                      :bg-color *controls-color*))
+         (numbox (om-make-view
+                  'om-zoom-pop-up
+                  :position (om-make-point 105 4)
+                  :size (om-make-point 60 18)
+                  :value pct
+                  :presets '(50 100 150 200 300 400)
+                  :font *om-default-font1*
+                  :bg-color *om-white-color*
+                  :di-action #'(lambda (widget new-pct)
+                                 (declare (ignore widget))
+                                 (om-zoom-numbox-apply panel (/ new-pct 100.0))))))
+    (om-add-subviews bar out-btn in-btn zoom-bg zoom-label numbox)
+    (om-add-subviews editor bar)
+    (when panel
+      (setf (capi:capi-object-property panel :om-zoom-numbox) numbox))
+    (setf (capi:capi-object-property editor :om-zoom-editor-bar) bar)
+    bar))
 
 ; Editor to define a Generic Function for the first time
 (defun make-new-genfunwin (self name iconid doc &optional (package *package-user*))
@@ -368,7 +488,7 @@ Elements of methodPanels are instaces of the boxframe class.#enddoc#
      (setf (win-mod editor) :abs)
      (setf (name thescroll) name)
      (om-select-window new-win)
-     (newgenfun-add-window-buttons thescroll)
+     ;; (newgenfun-add-window-buttons thescroll)  ; superseded by methodEditor zoom bar
      (set-field-size thescroll)
      ))
 
@@ -406,14 +526,19 @@ Elements of methodPanels are instaces of the boxframe class.#enddoc#
                                                  't ind (om-make-point (+ 5 (* ind 50)) 45))))
                (setf (enable inbox) nil)
                (setf (keys inbox) intype)
-               (omG-add-element thescroll (make-frame-from-callobj inbox))
+               (omG-add-element thescroll
+                                (let ((*make-frame-zoom-context*
+                                       (and (typep thescroll 'om-scroller) (om-zoom-of thescroll))))
+                                  (make-frame-from-callobj inbox)))
                (incf ind))
              (setf intype item)))
      (loop for i from 0 to  (- outputs 1) do
            (omG-add-element thescroll
-                            (make-frame-from-callobj 
-                             (make-new-output (mk-unique-name thescroll "output")
-                                              i (om-make-point (+ 5 (* i 50)) 240)))))
+                            (let ((*make-frame-zoom-context*
+                                   (and (typep thescroll 'om-scroller) (om-zoom-of thescroll))))
+                              (make-frame-from-callobj
+                               (make-new-output (mk-unique-name thescroll "output")
+                                                i (om-make-point (+ 5 (* i 50)) 240))))))
      ;;;new
      (set-field-size thescroll)
      (om-select-window new-win)

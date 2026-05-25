@@ -202,9 +202,11 @@
                                   :action
                                   #'(lambda(item)  (declare (ignore item))
                                       (omG-add-element self
-                                                       (make-frame-from-callobj 
-                                                        (omNG-make-new-boxcall (fdefinition 'StreamFile) (om-make-point 50 30) 
-                                                                               (mk-unique-name self "StreamFile"))))))
+                                                       (let ((*make-frame-zoom-context*
+                                                              (and (typep self 'om-scroller) (om-zoom-of self))))
+                                                         (make-frame-from-callobj
+                                                          (omNG-make-new-boxcall (fdefinition 'StreamFile) (om-make-point 50 30)
+                                                                                 (mk-unique-name self "StreamFile")))))))
                     ))
 
 

@@ -65,9 +65,26 @@
                        :value (nth 6 *edo-names-0*)
                        :range *edo-names-0*))
 
+#|
 (defmethod update-di-size ((self fl-microtune) container)
   (om-set-view-position self (om-make-point 10 (- (round (h container) 2) 11)))
   (om-set-view-size self (om-make-point (- (w container) 20) 30))) ;24
+|#
+
+(defmethod update-di-size ((self fl-microtune) container)
+  (let ((zoom (om-zoom-effective container)))
+    (om-set-view-position self
+                          (om-make-point (round (* 10 zoom))
+                                         (- (round (h container) 2)
+                                            (round (* 11 zoom)))))
+    (om-set-view-size self
+                      (om-make-point (- (w container) (round (* 20 zoom)))
+                                     (round (* 30 zoom)))) ;24
+    (let ((logical-font (om-zoom-logical-font self)))
+      (when logical-font
+        (om-set-font self (if (= zoom 1.0)
+                              logical-font
+                            (om-zoom-scale-font logical-font zoom)))))))
 
 
 (defmethod om-dialog-item-action ((self fl-microtune)) 
@@ -153,9 +170,26 @@
                        :range pgms
                        )))
 
-(defmethod update-di-size ((self fl-pgm) container) 
+#|
+(defmethod update-di-size ((self fl-pgm) container)
   (om-set-view-position self (om-make-point 10 (- (round (h container) 2) 11)))
   (om-set-view-size self (om-make-point (- (w container) 20) 30)));24
+|#
+
+(defmethod update-di-size ((self fl-pgm) container)
+  (let ((zoom (om-zoom-effective container)))
+    (om-set-view-position self
+                          (om-make-point (round (* 10 zoom))
+                                         (- (round (h container) 2)
+                                            (round (* 11 zoom)))))
+    (om-set-view-size self
+                      (om-make-point (- (w container) (round (* 20 zoom)))
+                                     (round (* 30 zoom)))) ;24
+    (let ((logical-font (om-zoom-logical-font self)))
+      (when logical-font
+        (om-set-font self (if (= zoom 1.0)
+                              logical-font
+                            (om-zoom-scale-font logical-font zoom)))))))
 
 
 (defmethod om-dialog-item-action ((self fl-pgm)) 
@@ -251,6 +285,7 @@
   (om-make-dialog-item 'fl-gain (om-make-point 1 4 ) (om-make-point 50 20 ) "untitled" :range '(0 127) :increment 1 :value 64))
 
 
+#|
 (defmethod update-di-size ((self fl-gain) container)
    (if (equal (om-get-slider-orientation self) :horizontal)
        (progn
@@ -259,6 +294,32 @@
      (progn
          (om-set-view-position self (om-make-point (- (round (w container) 2) 12) 8))
          (om-set-view-size self (om-make-point 24 (- (h container) 16))))))
+|#
+
+(defmethod update-di-size ((self fl-gain) container)
+  (let ((zoom (om-zoom-effective container)))
+    (if (equal (om-get-slider-orientation self) :horizontal)
+        (progn
+          (om-set-view-position self
+                                (om-make-point (round (* 8 zoom))
+                                               (- (round (h container) 2)
+                                                  (round (* 12 zoom)))))
+          (om-set-view-size self
+                            (om-make-point (- (w container) (round (* 16 zoom)))
+                                           (round (* 24 zoom)))))
+      (progn
+        (om-set-view-position self
+                              (om-make-point (- (round (w container) 2)
+                                                 (round (* 12 zoom)))
+                                             (round (* 8 zoom))))
+        (om-set-view-size self
+                          (om-make-point (round (* 24 zoom))
+                                         (- (h container) (round (* 16 zoom)))))))
+    (let ((logical-font (om-zoom-logical-font self)))
+      (when logical-font
+        (om-set-font self (if (= zoom 1.0)
+                              logical-font
+                            (om-zoom-scale-font logical-font zoom)))))))
 
 
 
@@ -343,6 +404,7 @@
   (om-make-dialog-item 'fl-pan (om-make-point 1 4 ) (om-make-point 50 20 ) "untitled" :range '(0 127) :increment 1 :value 64))
 
 
+#|
 (defmethod update-di-size ((self fl-pan) container)
    (if (equal (om-get-slider-orientation self) :horizontal)
        (progn
@@ -351,6 +413,32 @@
      (progn
          (om-set-view-position self (om-make-point (- (round (w container) 2) 12) 8))
          (om-set-view-size self (om-make-point 24 (- (h container) 16))))))
+|#
+
+(defmethod update-di-size ((self fl-pan) container)
+  (let ((zoom (om-zoom-effective container)))
+    (if (equal (om-get-slider-orientation self) :horizontal)
+        (progn
+          (om-set-view-position self
+                                (om-make-point (round (* 8 zoom))
+                                               (- (round (h container) 2)
+                                                  (round (* 12 zoom)))))
+          (om-set-view-size self
+                            (om-make-point (- (w container) (round (* 16 zoom)))
+                                           (round (* 24 zoom)))))
+      (progn
+        (om-set-view-position self
+                              (om-make-point (- (round (w container) 2)
+                                                 (round (* 12 zoom)))
+                                             (round (* 8 zoom))))
+        (om-set-view-size self
+                          (om-make-point (round (* 24 zoom))
+                                         (- (h container) (round (* 16 zoom)))))))
+    (let ((logical-font (om-zoom-logical-font self)))
+      (when logical-font
+        (om-set-font self (if (= zoom 1.0)
+                              logical-font
+                            (om-zoom-scale-font logical-font zoom)))))))
 
 
 

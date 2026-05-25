@@ -303,12 +303,21 @@
                                                 (om-with-line '(2 2) (om-draw-rect x y w h :pensize 2)))))
                          :draw-pane panel :display-mode nil
                          :release-action #'(lambda (view pp1 pp2)
+                                             #|
                                              (let ((p1 (om-view-position boxframe))
                                                    (p2 pp2))
-                                               (change-boxframe-size boxframe 
+                                               (change-boxframe-size boxframe
                                                                      (om-add-points (om-view-size boxframe)
                                                                                     (om-subtract-points pp2 pp1)))
-                                               )))
+                                               )
+                                             |#
+                                             (let* ((z (om-zoom-effective boxframe))
+                                                    (new-vis-size (om-add-points (om-view-size boxframe)
+                                                                                 (om-subtract-points pp2 pp1)))
+                                                    (new-log-size (if (= z 1.0)
+                                                                      new-vis-size
+                                                                      (om-zoom-unscale-point new-vis-size z))))
+                                               (change-boxframe-size boxframe new-log-size))))
 
     ))
 

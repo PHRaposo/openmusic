@@ -372,6 +372,9 @@
                  (doc (str-with-nl (nth 5 wsparams))))
             (setf newicon (nth 6 wsparams))
             (setf (wsparams newobj) (loop for item in wspar collect (eval item)))
+            (let ((zoom (nth 10 wsparams)))
+              (when (and zoom (numberp zoom) (/= zoom 1.0))
+                (set-win-zoom newobj zoom)))
             (setf (doc newobj) doc)
             (setf (omversion newobj) (car wsparams))
             (setf (create-info newobj) (list (nth 8 wsparams) (nth 9 wsparams)))
@@ -500,8 +503,11 @@
 (defmethod om-import-files-in-app ((self patchpanel) files)
   (when (= 1 (length files))
     (let ((newbox (import-dragged-object self (pathname (car files)) (om-mouse-position self))))
-      (if newbox 
-        (progn (omG-add-element self (make-frame-from-callobj newbox)) t)
+      (if newbox
+        (progn (omG-add-element self
+                                (let ((*make-frame-zoom-context*
+                                       (and (typep self 'om-scroller) (om-zoom-of self))))
+                                  (make-frame-from-callobj newbox))) t)
         (om-beep-msg (string+ "File: " (namestring (pathname (car files))) " can not be imported in the patch."))))))
 
 (defmethod om-drag-string-in-app ((self patchpanel) str)

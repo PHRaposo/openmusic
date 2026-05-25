@@ -37,7 +37,10 @@
                                :winpos (get-win-position object)))
      (om-with-delayed-update (panel newwindow)
        (mapc #'(lambda (elem)
-                 (let ((newframe (make-frame-from-callobj elem)))
+                 (let ((newframe (let ((*make-frame-zoom-context*
+                                        (and (typep (panel newwindow) 'om-scroller)
+                                             (om-zoom-of (panel newwindow)))))
+                                   (make-frame-from-callobj elem))))
                    (om-add-subviews (panel newwindow) newframe)
                    (add-subview-extra newframe))) elements)
        (mapc #'(lambda (elem)
@@ -85,7 +88,10 @@
                (when (listp iconID)
                  (icon-for-user-package new-object (second iconID)))
                (setf new-frame (omNG-add-element (object scrollframe) new-object))
-               (om-add-subviews scrollframe (make-frame-from-callobj new-frame)))))))))
+               (om-add-subviews scrollframe
+                                (let ((*make-frame-zoom-context*
+                                       (and (typep scrollframe 'om-scroller) (om-zoom-of scrollframe))))
+                                  (make-frame-from-callobj new-frame))))))))))
 
 
 ;--------------
@@ -182,10 +188,12 @@ Boxes refer to classes and connections to inheritance.#enddoc#
     (if (protected-p (object (editor self)))
         (list (om-new-leafmenu "Protected Package" nil nil nil))
       (list
-       (om-package-classes2menu *om-package-tree* "Select Superclass" #'(lambda (c) 
+       (om-package-classes2menu *om-package-tree* "Select Superclass" #'(lambda (c)
                                                                           (let ((object (omNG-make-new-boxalias c pos (string+ (name c) "-alias"))))
                                                                             (when object
-                                                                              (let ((new-frame (make-frame-from-callobj object)))
+                                                                              (let ((new-frame (let ((*make-frame-zoom-context*
+                                                                                                      (and (typep self 'om-scroller) (om-zoom-of self))))
+                                                                                                 (make-frame-from-callobj object))))
                                                                                 (omG-add-element self new-frame)
                                                                                 )))))
        (om-new-leafmenu "Import Class"

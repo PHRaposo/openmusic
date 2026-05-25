@@ -219,12 +219,12 @@ In this case, all internal events are sent simultaneously.
 ;;;===============================
 
 (defmethod* Play ((self fluid-synth-console) &key (player t))
-   :initvals '(nil nil 2 nil nil) 
-   :indoc '("object" "a player designator") 
+   :initvals '(nil nil 2 nil nil)
+   :indoc '("object" "a player designator")
    :icon 207
    :doc "Plays any OM Musical object.
 
-<player> designates a particular player (t = dispatch automatically) 
+<player> designates a particular player (t = dispatch automatically)
 "
    (let ((crtls (channels-ctrl self)))
      (loop for i in crtls
@@ -295,7 +295,11 @@ In this case, all internal events are sent simultaneously.
   ;;;(:default-initargs :scrollbars :h :retain-scrollbars t)
    )
 
-(defmethod editor ((self fluidcontrollerPanel)) 
+(defmethod om-zoom-touch-update ((pane fluidcontrollerPanel) scale anchor-x anchor-y)
+  (declare (ignore scale anchor-x anchor-y))
+  nil)
+
+(defmethod editor ((self fluidcontrollerPanel))
   (om-view-container self))
 
 (defmethod get-object ((Self fluidcontrollerPanel))

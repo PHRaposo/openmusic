@@ -1230,7 +1230,14 @@
                     (borne-position posi))
               (loop for item in (get-actives target) do
                     (omG-unselect item))
+              #|
               (let ((new-frame (make-frame-from-callobj newbox)))
+                (omG-add-element target new-frame)
+                (omG-select new-frame))
+              |#
+              (let ((new-frame (let ((*make-frame-zoom-context*
+                                      (and (typep target 'om-scroller) (om-zoom-of target))))
+                                 (make-frame-from-callobj newbox))))
                 (omG-add-element target new-frame)
                 (omG-select new-frame))
               )

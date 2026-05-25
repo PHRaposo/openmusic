@@ -571,11 +571,12 @@
 ;Controls par default
 ;===========================================================
 
-(defclass omcontrols-view (3dBorder-view) 
-  ((slotedit :initform nil :accessor slotedit))
-  (:default-initargs 
+(defclass omcontrols-view (3dBorder-view)
+  ((slotedit :initform nil :accessor slotedit)
+   (zoom-numbox :initform nil :accessor zoom-numbox))
+  (:default-initargs
    :draw-with-buffer t
-    :c++ *controls-color++* :c+ *controls-color+* 
+    :c++ *controls-color++* :c+ *controls-color+*
     :c-- *controls-color--* :c- *controls-color-*))
 
 (defmethod GET-staff-LIST ((self omcontrols-view)) *chord-satff-om*)
@@ -795,11 +796,12 @@
 
 
 
+#|
 (defun add-zoom2control (control zoom &optional position)
   (setf zoom (if zoom (round (* zoom 100)) 100))
   (let ((pos (or (om-add-points position (om-make-point 3 2))
                  (om-make-point 100 2))))
-  (om-add-subviews control 
+  (om-add-subviews control
                    (om-make-dialog-item 'edit-numbox pos (om-make-point 46 18) (format nil " ~D" zoom)
                                         :di-action (om-dialog-item-act item
                                                               (change-editor-zoom (panel (om-view-container (om-view-container item))) (value item)))
@@ -813,6 +815,35 @@
                    (om-make-dialog-item 'om-static-text (om-make-point (- (om-point-h pos) 40) 4) (om-make-point 40 20) "Zoom"
                                          :font *om-default-font1*
                                          :bg-color *controls-color*))))
+|#
+
+(defun add-zoom2control (control zoom &optional position)
+  (setf zoom (if zoom (round (* zoom 100)) 100))
+  (let* ((pos (or (om-add-points position (om-make-point 3 2))
+                  (om-make-point 100 2)))
+         (zoom-nb (om-make-dialog-item 'edit-numbox pos (om-make-point 46 18) (format nil " ~D" zoom)
+                                       :di-action (om-dialog-item-act item
+                                                            (change-editor-zoom (panel (om-view-container (om-view-container item))) (value item)))
+                                       :font *om-default-font1*
+                                       :bg-color *om-white-color*
+                                       :value zoom
+                                       :afterfun #'(lambda (item)
+                                                     (change-editor-zoom (panel (om-view-container (om-view-container item))) (value item)))
+                                       :min-val 1
+                                       :max-val 1000)))
+    (om-add-subviews control
+                     zoom-nb
+                     (om-make-dialog-item 'om-static-text (om-make-point (- (om-point-h pos) 40) 4) (om-make-point 40 20) "Zoom"
+                                          :font *om-default-font1*
+                                          :bg-color *controls-color*))
+    (when (slot-exists-p control 'zoom-numbox)
+      (setf (zoom-numbox control) zoom-nb))
+    zoom-nb))
+
+(defun find-score-zoom-numbox (panel)
+  (let* ((ed  (and (typep panel 'om-graphic-object) (editor panel)))
+         (ctr (and ed (slot-exists-p ed 'ctr-view) (ctr-view ed))))
+    (and ctr (slot-exists-p ctr 'zoom-numbox) (zoom-numbox ctr))))
 
 (defmethod additional-port-menu ((self t) &key (pos (om-make-point 410 1)) (color *om-white-color*) (in t) (out t))
   (when in
@@ -1068,19 +1099,63 @@
 (defmethod toggle-analysis-mode ((self scorePanel))
   (change-score-mode self 3))
 
+#|
 (defmethod handle-key-event ((self scorePanel) char)
   (cond ((in-patch-mode? self)
          (case char
            (#\t (mk-musobj-box self))
-           (#\s (if (om-command-key-p) 
+           (#\s (if (om-command-key-p)
                     (omng-save (mycontainer (associated-box (object (editor self)))))
                   (toggle-normal-mode self)))
            (#\SPACE (editor-play/stop (editor self)))
            (:om-key-tab (change-obj-mode self 1))
-          ; (#\r (get-score-tree self)) ;;wait for score-box distribution fix 
+          ; (#\r (get-score-tree self)) ;;wait for score-box distribution fix
            (t (call-next-method))))
         ((edit-cursor self)
-         (cond 
+         (cond
+          ((and (rythmic? (edit-cursor self)) (char-is-figure char))
+           (add-or-replace-in-measure self char))
+          ((or (equal char :om-key-return) (equal char :om-key-enter))
+           ...)
+          ...))
+        ((om-command-key-p) (scroll-pane self char))
+        (t ...))
+  ;; Original Ctrl-branch tinha apenas (scroll-pane self char); a nova
+  ;; versao deste defmethod insere os atalhos Ctrl+=/+/-/0 antes do
+  ;; edit-cursor (que nao tem t-fallback) para que cursor ativo nao
+  ;; engula os atalhos de zoom.
+  )
+|#
+
+(defmethod handle-key-event ((self scorePanel) char)
+  (cond ((in-patch-mode? self)
+         (case char
+           (#\t (mk-musobj-box self))
+           (#\s (if (om-command-key-p)
+                    (omng-save (mycontainer (associated-box (object (editor self)))))
+                  (toggle-normal-mode self)))
+           (#\SPACE (editor-play/stop (editor self)))
+           (:om-key-tab (change-obj-mode self 1))
+          ; (#\r (get-score-tree self)) ;;wait for score-box distribution fix
+           (t (call-next-method))))
+        ((om-command-key-p)
+         (cond
+          ((or (equal char #\=) (equal char #\+))
+           (change-editor-zoom
+            self
+            (max 1 (min 1000 (round (* (staff-zoom self) 110)))))
+           t)
+          ((equal char #\-)
+           (change-editor-zoom
+            self
+            (max 1 (min 1000 (round (/ (* (staff-zoom self) 100) 1.1)))))
+           t)
+          ((equal char #\0)
+           (change-editor-zoom self 100)
+           t)
+          (t (scroll-pane self char))))
+        ((edit-cursor self)
+         (cond
           ((and (rythmic? (edit-cursor self)) (char-is-figure char))
            (add-or-replace-in-measure self char))
           ((or (equal char :om-key-return) (equal char :om-key-enter))
@@ -1102,8 +1177,8 @@
           ;;; MARCHE PAS
           ((equal char #\.) (point-edit-cursor self))
           ))
-        ((om-command-key-p) (scroll-pane self char))
-        (t 
+        (t
+
          (case char
            
            (#\SPACE (editor-play/stop (editor self)))
@@ -1389,11 +1464,13 @@
                        (make-new-extra-mode self graph-obj)
                        (setf graph-obj nil)))
                      )
-                   (cond 
-                    ((om-add-key-p) 
+                   (cond
+                    ((om-add-key-p)
                      (if (analysis-mode? self)
                          (handle-add-click-analysis self where)
-                       (add-new-object self mode-obj where graph-obj))
+                       #| (add-new-object self mode-obj where graph-obj) |#
+                       (unless *extramanager* ;avoiding conflict when extra editor is active
+                         (add-new-object self mode-obj where graph-obj)))
                      (when (editor self) (update-inspector (editor self) 0)))
                     ((and (grap-extra-p graph-obj) double-click-p)
                      ;(open-extra-editor self graph-obj)
@@ -2194,6 +2271,7 @@
       )))
 |#
 
+#|
 (defmethod change-editor-zoom ((self scorePanel) newzoom)
   (unless (= (staff-zoom self) newzoom)
     (setf (staff-zoom self) (/ newzoom 100))
@@ -2204,6 +2282,28 @@
       (update-panel self )
       #+macosx(update-slot-edit self); maybe also others, linux, etc.?
       )))
+|#
+
+(defmethod change-editor-zoom ((self scorePanel) newzoom)
+  (unless (= (staff-zoom self) newzoom)
+    (setf (staff-zoom self) (/ newzoom 100))
+    (set-edit-param (om-view-container self) 'zoom  (/ newzoom 100))
+    (unless (score-page-mode self)
+      (om-redraw-view self))
+    (when (or (score-page-mode self) (in-patch-mode? self))
+      (update-panel self )
+      #+macosx(update-slot-edit self); maybe also others, linux, etc.?
+      )
+    (let ((nb (find-score-zoom-numbox self)))
+      (when (and nb (not (= (value nb) newzoom)))
+        (set-value nb newzoom)))))
+
+(defmethod om-zoom-touch-update ((pane scorePanel) scale anchor-x anchor-y)
+  (declare (ignore anchor-x anchor-y))
+  (let* ((current      (staff-zoom pane))
+         (new-fraction (* (or current 1) scale))
+         (new-pct      (max 1 (min 1000 (round (* new-fraction 100))))))
+    (change-editor-zoom pane new-pct)))
 
 #|
 (defmethod change-obj-mode ((self scorePanel) val)
@@ -2573,6 +2673,25 @@
 (defclass chordPanel (scorePanel) ())
 
 
+(defmethod om-zoom-touch-update ((pane notePanel) scale anchor-x anchor-y)
+  (declare (ignore scale anchor-x anchor-y))
+  nil)
+
+(defmethod om-zoom-touch-update ((pane chordPanel) scale anchor-x anchor-y)
+  (declare (ignore scale anchor-x anchor-y))
+  nil)
+
+(defmethod handle-key-event ((self notePanel) char)
+  (if (and (om-command-key-p) (member char '(#\= #\+ #\- #\0)))
+      t
+    (call-next-method)))
+
+(defmethod handle-key-event ((self chordPanel) char)
+  (if (and (om-command-key-p) (member char '(#\= #\+ #\- #\0)))
+      t
+    (call-next-method)))
+
+
 ;--------------ACTIONS
 
 (defmethod get-key-space ((self chordPanel))
@@ -2582,7 +2701,49 @@
 (defmethod find-indice-new-note ((self chordPanel) x)
    (let ((realpix (- x (get-key-space self))))
      (if (<= realpix 0) 0
-         (ceiling (- x (get-key-space self)) (* (staff-zoom self)  2 (staff-size self))))))                        
+         (ceiling (- x (get-key-space self)) (* (staff-zoom self)  2 (staff-size self))))))
+
+
+;----------------------PLAY
+
+(defclass arp-chord ()
+  ((notes :initform nil :initarg :notes :accessor notes)))
+
+(add-player-for-object 'arp-chord '(:midi-player :osc-scoreplayer :microplayer))
+
+(defmethod extent ((self arp-chord))
+   (* (length (notes self)) 500))
+
+(defmethod get-obj-dur ((self arp-chord)) (extent self))
+
+(defmethod play-obj? ((self arp-chord)) t)
+
+(defmethod chord-obj-to-play ((self chord) mode)
+  (if (find mode '(1 2 3) :test '=)
+     (let ((notes (copy-list (inside self))))
+       (case mode
+         (1 (make-instance 'arp-chord :notes (sort notes '< :key 'midic)))
+         (2 (make-instance 'arp-chord :notes (sort notes '> :key 'midic)))
+         (3 (make-instance 'arp-chord :notes notes)))
+       )
+    self))
+
+;=== Play a chord in "arp" mode
+(defmethod PrepareToPlay ((player t) (chord arp-chord) at &key  approx port interval voice)
+     ;(setf port (verify-port port))
+    (loop for note in (notes chord)
+          for offset from 0 by 400
+          collect (PrepareToPlay player note (+ offset at)
+                                 :approx approx
+                                 :port port :interval interval :voice voice)))
+
+;;; request from TM/JF: never play a box in "arp" mode
+;;; to do it, just use mode = 0 always
+(defmethod play-obj-from-value ((value chord) (box omboxeditcall))
+  (chord-obj-to-play value (get-edit-param box 'mode)))
+
+(defmethod get-obj-to-play ((self chordeditor))
+  (chord-obj-to-play (object self) (staff-mode (panel self))))
 
 
 (defmethod panel-show-cursor-p ((self chordpanel)) t)
