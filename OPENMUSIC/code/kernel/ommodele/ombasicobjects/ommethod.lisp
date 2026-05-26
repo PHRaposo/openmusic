@@ -128,10 +128,10 @@ Class methods are the init-instance method and slot reader and writer. #class-me
         ((class-method-p self)
          (open-class-ommethode self))
         (t (if (graph-fun self)
-             (panel (open-new-RelationFrame self 
-                                            (format nil "OM Method -  ~A ~A" 
-                                                    (name self) 
-                                                    (if (car (method-qualifiers self)) 
+             (panel (open-new-RelationFrame self
+                                            (format nil "OM Method -  ~A ~A"
+                                                    (name self)
+                                                    (if (car (method-qualifiers self))
                                                         (string+ "(:" (string (car (method-qualifiers self))) ")")
                                                       ""))
                                             (graph-fun self)))

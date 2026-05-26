@@ -35,7 +35,8 @@
    ((ed-mode :initform "supersede" :initarg :ed-mode :accessor ed-mode)
     (eval-mode :initform "list" :initarg :eval-mode :accessor eval-mode)
     (file-name :initform nil :accessor file-name)
-    (buffer-text :initform nil :accessor buffer-text))
+    (buffer-text :initform nil :accessor buffer-text)
+    (w-zoom :accessor w-zoom :initform 1.0))
    (:icon 203)
    (:documentation
 "TextFile represents a text buffer in a visual program. It can be used to enter or collect data and is editable in a text window.
@@ -260,23 +261,47 @@ As output it returns the contents of the text buffer as a list formatted accordi
 
 ;--------------Copy & Save----------------
 
+#|
 (defmethod omng-copy ((self TextFile))
    `(let ((newtextfile (make-instance ',(type-of self)
                            :ed-mode ,(ed-mode self) :ed-mode ,(ed-mode self))))
         (setf (buffer-text newtextfile) ,(om-copy-buffer (buffer-text self)))
         (setf (file-name newtextfile) ,(file-name self))
         newtextfile))
+|#
+
+(defmethod omng-copy ((self TextFile))
+   `(let ((newtextfile (make-instance ',(type-of self)
+                           :ed-mode ,(ed-mode self) :ed-mode ,(ed-mode self))))
+        (setf (buffer-text newtextfile) ,(om-copy-buffer (buffer-text self)))
+        (setf (file-name newtextfile) ,(file-name self))
+        (setf (w-zoom newtextfile) ,(w-zoom self))
+        newtextfile))
     
+#|
 (defmethod omNG-save ((self TextFile) &optional (values? nil))
   (declare (ignore values?))
-  (when (file-name self) 
+  (when (file-name self)
     (register-resource :text (file-name self)))
   (if (file-name self)
-      `(load-textfile ,(om-save-pathname-relative (file-name self)) 
+      `(load-textfile ,(om-save-pathname-relative (file-name self))
                       ',(type-of self) ,(ed-mode self) ,(eval-mode self))
-    `(load-buffer-textfile ',(list-of-lines (buffer-text self)) 
+    `(load-buffer-textfile ',(list-of-lines (buffer-text self))
                            ',(type-of self) ,(ed-mode self) ,(eval-mode self))))
+|#
 
+(defmethod omNG-save ((self TextFile) &optional (values? nil))
+  (declare (ignore values?))
+  (when (file-name self)
+    (register-resource :text (file-name self)))
+  (capture-textfile-window-zoom self)
+  (if (file-name self)
+      `(load-textfile ,(om-save-pathname-relative (file-name self))
+                      ',(type-of self) ,(ed-mode self) ,(eval-mode self) ,(w-zoom self))
+    `(load-buffer-textfile ',(list-of-lines (buffer-text self))
+                           ',(type-of self) ,(ed-mode self) ,(eval-mode self) ,(w-zoom self))))
+
+#|
 (defun load-textfile (filename class edmode &optional (evmode "text"))
   (let ((newtextfile (make-instance class
                        :ed-mode edmode :eval-mode evmode)))
@@ -298,6 +323,32 @@ As output it returns the contents of the text buffer as a list formatted accordi
           (om-buffer-insert (buffer-text newtextfile) item)
           (om-buffer-insert-newline (buffer-text newtextfile))
           )
+    newtextfile))
+|#
+
+(defun load-textfile (filename class edmode &optional (evmode "text") (zoom 1.0))
+  (let ((newtextfile (make-instance class
+                       :ed-mode edmode :eval-mode evmode)))
+    (setf (buffer-text newtextfile) (om-make-buffer))
+    (if (and filename (pathnamep filename) (probe-file (restore-path filename)))
+      (progn
+        (om-buffer-insert-file (buffer-text newtextfile) (restore-path filename))
+        (setf (file-name newtextfile) (restore-path filename)))
+      (om-beep-msg (string+ "I didn't open the file " (namestring filename))))
+    (when (numberp zoom) (setf (w-zoom newtextfile) zoom))
+    newtextfile))
+
+;;; !!! les lignes..
+(defun load-buffer-textfile (listline class edmode &optional (evmode "text") (zoom 1.0))
+  (let ((newtextfile (make-instance class
+                                    :ed-mode edmode
+                                    :eval-mode evmode)))
+    (setf (buffer-text newtextfile) (om-make-buffer))
+    (loop for item in listline do
+          (om-buffer-insert (buffer-text newtextfile) item)
+          (om-buffer-insert-newline (buffer-text newtextfile))
+          )
+    (when (numberp zoom) (setf (w-zoom newtextfile) zoom))
     newtextfile))
 
 
@@ -325,16 +376,17 @@ As output it returns the contents of the text buffer as a list formatted accordi
                                  (resize nil) (maximize nil))
   (open-new-textedit object ref))
 
+#|
 ;;; no EDITOR slot
 ;;; editorframe is the window itself
-(defmethod open-new-textedit ((self TextFile) box) 
+(defmethod open-new-textedit ((self TextFile) box)
   (unless (buffer-text self)
     (setf (buffer-text self) (om-make-buffer)))
   (setf (editorframe box) (om-make-window 'TextEditorWindow
                                           :object self
                                           :ref box
                                           :font (om-make-font "courier" 20)
-                                          :window-title (if (file-name self) 
+                                          :window-title (if (file-name self)
                                                             (namestring (file-name self))
                                                           "TextFile")
                                           :size (om-make-point 500 400)
@@ -346,6 +398,29 @@ As output it returns the contents of the text buffer as a list formatted accordi
 
   ;(om-set-bg-color (editorframe box) *text-bg-color*);remove?
   (om-add-menu-to-win (editorframe box))
+  (editorframe box))
+|#
+
+;;; no EDITOR slot
+;;; editorframe is the window itself
+(defmethod open-new-textedit ((self TextFile) box)
+  (unless (buffer-text self)
+    (setf (buffer-text self) (om-make-buffer)))
+  (setf (editorframe box) (om-make-window 'TextEditorWindow
+                                          :object self
+                                          :ref box
+                                          :font (om-make-font "courier" 20)
+                                          :window-title (if (file-name self)
+                                                            (namestring (file-name self))
+                                                          "TextFile")
+                                          :size (om-make-point 500 400)
+                                          :position :centered
+                                          :ask-for-save nil
+                                          :editor-buffer (buffer-text self)
+                                          :editor-file (file-name self)
+                                          ))
+  (om-add-menu-to-win (editorframe box))
+  (apply-saved-textfile-zoom (editorframe box) self)
   (editorframe box))
 
 
@@ -363,7 +438,32 @@ As output it returns the contents of the text buffer as a list formatted accordi
 ;                   :textbuffer (buffer-text object)
 ;                   :ask-for-save t))
 
-(defmethod om-window-close-event :after ((self TextEditorWindow)) 
+(defun find-textfile-editor (textfile)
+  "Locate the open TextEditorWindow whose OBJECT is TEXTFILE, or NIL."
+  (loop for win in (om-get-all-windows 'TextEditorWindow)
+        when (eql (object win) textfile) return win))
+
+(defun capture-textfile-window-zoom (textfile &optional editor)
+  (let ((win (or editor (find-textfile-editor textfile))))
+    (when win
+      (let ((ep (om-lisp::ep win)))
+        (when (and ep (capi:capi-object-property ep :om-zoom-default-font))
+          (setf (w-zoom textfile) (oa::pane-current-zoom-ratio ep)))))))
+
+(defun apply-saved-textfile-zoom (editor textfile)
+  (when (and (slot-exists-p textfile 'w-zoom)
+             (slot-boundp textfile 'w-zoom))
+    (let ((ep (om-lisp::ep editor))
+          (ratio (w-zoom textfile)))
+      (when (and ep
+                 (capi:capi-object-property ep :om-zoom-default-font)
+                 (not (= ratio 1.0)))
+        (oa::set-pane-zoom-ratio ep ratio)))))
+
+(defmethod om-window-close-event :before ((self TextEditorWindow))
+  (when (object self) (capture-textfile-window-zoom (object self) self)))
+
+(defmethod om-window-close-event :after ((self TextEditorWindow))
   (cond ((null (ref self)) nil)
         ((slot-initform-p (ref self))
          (change-initform-ed (ref self) (object self)) )
@@ -443,6 +543,9 @@ else create a new Editor frame, and select its window."
                                          :ed-mode intype
                                          :eval-mode ev-mode
                                          )))
+             (when (and (slot-exists-p (value self) 'w-zoom)
+                        (slot-boundp (value self) 'w-zoom))
+               (setf (w-zoom newtextfile) (w-zoom (value self))))
              (when (editorframe self)
                (om-close-window (om-view-window (editorframe self)))
                (om-kill-buffer (buffer-text (value self))))

@@ -483,10 +483,20 @@ So abstractions or red patches can not be sharing.#enddoc#
    (declare (ignore values?))
    (om-beep-msg "This patch is into a patch, try saving the containing patch") nil)
        
+#|
 (defmethod omNG-copy ((self OMPatchAbs))
    "Not duplication or the mypathname slot"
    (let ((obj (call-next-method)))
      `(let ((copy ,obj))
+        (compile-patch copy)
+        copy)))
+|#
+
+(defmethod omNG-copy ((self OMPatchAbs))
+   "Not duplication or the mypathname slot"
+   (let ((obj (call-next-method)))
+     `(let ((copy ,obj))
+        (setf (w-zoom copy) ,(w-zoom self))
         (compile-patch copy)
         copy)))
 

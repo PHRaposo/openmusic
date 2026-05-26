@@ -183,9 +183,18 @@
                              ,(w-zoom self))))
 
 
+#|
 (defmethod omNG-copy ((self OMLispPatch))
   `(let ((copy ,(call-next-method)))
      (setf (lisp-exp copy) (lisp-exp ,self))
+     (compile-lisp-patch-fun copy)
+     copy))
+|#
+
+(defmethod omNG-copy ((self OMLispPatch))
+  `(let ((copy ,(call-next-method)))
+     (setf (lisp-exp copy) (lisp-exp ,self))
+     (setf (w-zoom copy) ,(w-zoom self))
      (compile-lisp-patch-fun copy)
      copy))
 

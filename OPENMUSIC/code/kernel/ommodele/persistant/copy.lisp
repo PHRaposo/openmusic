@@ -82,11 +82,12 @@
         copy))
 
 
+#|
 (defmethod omNG-copy ((self OMPatch))
-  
+
   (unless (loaded? self)
     (load-patch self))
-  
+
   `(let ((copy ,(call-next-method)))
      (loop for item in (list ,.(reverse (mapcar #'omNG-copy (boxes self)))) do
            (omng-add-element copy item))
@@ -97,7 +98,27 @@
      (setf (omversion copy) ,(omversion self))
      (setf (pictu-list copy) ',(mapcar 'copy-picture (pictu-list self)))
      (setf (lisp-exp-p copy) ,(lisp-exp-p self))
-     
+
+     copy))
+|#
+
+(defmethod omNG-copy ((self OMPatch))
+
+  (unless (loaded? self)
+    (load-patch self))
+
+  `(let ((copy ,(call-next-method)))
+     (loop for item in (list ,.(reverse (mapcar #'omNG-copy (boxes self)))) do
+           (omng-add-element copy item))
+     (copy-connections ',(boxes self) (boxes copy))
+
+     (set-icon-pos copy ,(om-copy-point (get-icon-pos self)))
+     (set-win-size copy ,(om-copy-point (get-win-size self)))
+     (set-win-zoom copy ,(get-win-zoom self))
+     (setf (omversion copy) ,(omversion self))
+     (setf (pictu-list copy) ',(mapcar 'copy-picture (pictu-list self)))
+     (setf (lisp-exp-p copy) ,(lisp-exp-p self))
+
      copy))
 
 #|
