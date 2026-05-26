@@ -324,8 +324,24 @@ Elements of methodPanels are instaces of the boxframe class.#enddoc#
 
 (defclass input-maker () ())
 
+#|
 (defmethod do-default-action ((self input-maker) icon)
   (let* ((thescroller (om-view-container icon))
+         (boxes (get-subframes thescroller))
+         (i (length (find-class-boxes boxes 'TypedInFrame)))
+         (pos (om-make-point (+ 5 (* i 50)) 45)))
+    (omG-add-element thescroller
+                     (let ((*make-frame-zoom-context*
+                            (and (typep thescroller 'om-scroller) (om-zoom-of thescroller))))
+                       (make-frame-from-callobj
+                        (make-new-typed-input (unique-name-from-list-new "input" (get-elements (object thescroller)) :mode :num :space nil)
+                                              't (+ i 1) pos))))))
+|#
+
+(defmethod do-default-action ((self input-maker) icon)
+  (let* ((thescroller (or (and (typep icon 'methodEditor-input-button)
+                               (target-panel icon))
+                          (om-view-container icon)))
          (boxes (get-subframes thescroller))
          (i (length (find-class-boxes boxes 'TypedInFrame)))
          (pos (om-make-point (+ 5 (* i 50)) 45)))
@@ -427,6 +443,7 @@ Elements of methodPanels are instaces of the boxframe class.#enddoc#
                                (declare (ignore item))
                                (modify-patch panel)
                                (add-output panel nil))))
+         #|
          (in-btn (om-make-view
                   'methodEditor-input-button
                   :object (make-instance 'input-maker)
@@ -439,6 +456,15 @@ Elements of methodPanels are instaces of the boxframe class.#enddoc#
                               (declare (ignore item))
                               (modify-patch panel)
                               (add-input panel nil))))
+         |#
+         (in-btn (om-make-view
+                  'methodEditor-input-button
+                  :object (make-instance 'input-maker)
+                  :target-panel panel
+                  :position (om-make-point 30 1)
+                  :size (om-make-point 24 24)
+                  :icon1 "in"
+                  :icon2 "in-pushed"))
          (zoom-bg (om-make-dialog-item
                    'om-static-text
                    (om-make-point 60 1)

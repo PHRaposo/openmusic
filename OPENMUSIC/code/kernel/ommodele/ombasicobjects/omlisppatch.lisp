@@ -30,8 +30,17 @@
 
 (in-package :om)
 
-(defclass OMLispPatch (OMPatch) 
+#|
+(defclass OMLispPatch (OMPatch)
   ((list-exp :initform nil :initarg :lisp-exp :accessor lisp-exp))
+  (:icon 124)
+  (:documentation "The a patch written in Lisp")
+  (:metaclass omstandardclass))
+|#
+
+(defclass OMLispPatch (OMPatch)
+  ((list-exp :initform nil :initarg :lisp-exp :accessor lisp-exp)
+   (w-zoom :accessor w-zoom :initform 1.0))
   (:icon 124)
   (:documentation "The a patch written in Lisp")
   (:metaclass omstandardclass))
@@ -86,25 +95,54 @@
     ))
 
 
+#|
 (defmethod load-abstraction-attributes ((self omlisppatch) currentpersistent)
   (call-next-method) ;;; ompatch
   (setf (lisp-exp self) (lisp-exp currentpersistent))
   (when (lisp-exp self) (compile-lisp-patch-fun self)))
+|#
+
+(defmethod load-abstraction-attributes ((self omlisppatch) currentpersistent)
+  (call-next-method)
+  (setf (lisp-exp self) (lisp-exp currentpersistent))
+  (when (and (slot-exists-p currentpersistent 'w-zoom)
+             (slot-boundp currentpersistent 'w-zoom))
+    (setf (w-zoom self) (w-zoom currentpersistent)))
+  (when (lisp-exp self) (compile-lisp-patch-fun self)))
 
 
 
+#|
 (defun om-load-lisp-patch (name version expression)
    (let ((newpatch (omNG-make-new-lisp-patch name)))
      (setf (omversion newpatch) version)
      (setf (lisp-exp newpatch) (get-lisp-str expression))
      newpatch))
+|#
 
+(defun om-load-lisp-patch (name version expression &optional (zoom 1.0))
+  (let ((newpatch (omNG-make-new-lisp-patch name)))
+    (setf (omversion newpatch) version)
+    (setf (lisp-exp newpatch) (get-lisp-str expression))
+    (setf (w-zoom newpatch) zoom)
+    newpatch))
+
+#|
 (defun om-load-lisp-abspatch (name version expression)
    (let ((newpatch (make-instance 'OMLispPatchAbs :name name :icon 123)))
      (setf (omversion newpatch) version)
      (setf (lisp-exp newpatch) (get-lisp-str expression))
      (compile-lisp-patch-fun newpatch)
      newpatch))
+|#
+
+(defun om-load-lisp-abspatch (name version expression &optional (zoom 1.0))
+  (let ((newpatch (make-instance 'OMLispPatchAbs :name name :icon 123)))
+    (setf (omversion newpatch) version)
+    (setf (lisp-exp newpatch) (get-lisp-str expression))
+    (setf (w-zoom newpatch) zoom)
+    (compile-lisp-patch-fun newpatch)
+    newpatch))
 
 (defmethod get-patch-inputs ((self OMLispPatch))
   (unless (compiled? self)
@@ -122,9 +160,27 @@
                        :name "lisp function output"
                        :indice 0)))
 
+(defun capture-lisp-window-zoom (patch)
+  (let ((editor (editorframe patch))
+        (cls (find-class 'patch-lambda-exp-window nil)))
+    (when (and editor cls (typep editor cls))
+      (let ((ep (om-lisp::ep editor)))
+        (when (and ep (capi:capi-object-property ep :om-zoom-default-font))
+          (setf (w-zoom patch) (oa::pane-current-zoom-ratio ep)))))))
+
+#|
 (defmethod om-save ((self OMLispPatch) &optional (values? nil))
-  `(setf *om-current-persistent* 
+  `(setf *om-current-persistent*
          (om-load-lisp-patch ,(name self) ,*om-version* ,(str-without-nl (lisp-exp self)))))
+|#
+
+(defmethod om-save ((self OMLispPatch) &optional (values? nil))
+  (declare (ignore values?))
+  (capture-lisp-window-zoom self)
+  `(setf *om-current-persistent*
+         (om-load-lisp-patch ,(name self) ,*om-version*
+                             ,(str-without-nl (lisp-exp self))
+                             ,(w-zoom self))))
 
 
 (defmethod omNG-copy ((self OMLispPatch))
@@ -134,9 +190,18 @@
      copy))
 
 
+#|
 (defmethod om-save ((self OMLispPatchAbs) &optional (values? nil))
    "Generation of code to save 'self'."
    `(om-load-lisp-abspatch ,(name self) ,*om-version* ,(str-without-nl (lisp-exp self))))
+|#
+
+(defmethod om-save ((self OMLispPatchAbs) &optional (values? nil))
+  (declare (ignore values?))
+  (capture-lisp-window-zoom self)
+  `(om-load-lisp-abspatch ,(name self) ,*om-version*
+                          ,(str-without-nl (lisp-exp self))
+                          ,(w-zoom self)))
 
 (defmethod abs2patch ((self OMLispPatchAbs) name pos)
    "Cons a new instance of 'OMPatch from the abstraction patch 'self'."

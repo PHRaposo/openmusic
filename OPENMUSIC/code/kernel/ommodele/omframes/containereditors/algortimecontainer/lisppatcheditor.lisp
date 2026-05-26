@@ -72,8 +72,9 @@
         rep)
     t))
 
+#|
 (defmethod om-window-close-event ((self patch-lambda-exp-window))
-  (handler-bind ((error #'(lambda (c) 
+  (handler-bind ((error #'(lambda (c)
                             (om-message-dialog (format nil "Patch Definition Error: ~S. ~%No modification will be make to the patch." (om-report-condition c)))
                             (om-kill-window-buffer self)
                             (when (patchref self)
@@ -88,6 +89,24 @@
     (om-kill-window-buffer self)
     (call-next-method)
     ))
+|#
+
+(defmethod om-window-close-event ((self patch-lambda-exp-window))
+  (handler-bind ((error #'(lambda (c)
+                            (om-message-dialog (format nil "Patch Definition Error: ~S. ~%No modification will be make to the patch." (om-report-condition c)))
+                            (om-kill-window-buffer self)
+                            (when (patchref self)
+                              (setf (editorframe (patchref self)) nil))
+                            (setf *patch-abort-definition* nil)
+                            (om-abort))))
+    (loop for item in (attached-objs (patchref self)) do
+          (update-from-reference item))
+    (setf (compiled? (patchref self)) t)
+    (when (patchref self) (capture-lisp-window-zoom (patchref self)))
+    (setf (editorframe (patchref self)) nil)
+    (setf *patch-abort-definition* nil)
+    (om-kill-window-buffer self)
+    (call-next-method)))
 
 (defmethod compile-before-close ((self patch-lambda-exp-window))
   (handler-bind ((error #'(lambda (c) 
@@ -141,6 +160,17 @@ Lambda expression are of the form (lambda <param-list> <body>)"))
    (editorframe self)
    )
 
+(defun apply-saved-lisp-zoom (editor patch)
+  (when (and (slot-exists-p patch 'w-zoom)
+             (slot-boundp patch 'w-zoom))
+    (let ((ep (om-lisp::ep editor))
+          (ratio (w-zoom patch)))
+      (when (and ep
+                 (capi:capi-object-property ep :om-zoom-default-font)
+                 (not (= ratio 1.0)))
+        (oa::set-pane-zoom-ratio ep ratio)))))
+
+#|
 (defmethod edit-existing-lambda-expression ((self ompatch))
    (let ((editor (om-make-window 'patch-lambda-exp-window
                                  :patchref self
@@ -151,6 +181,20 @@ Lambda expression are of the form (lambda <param-list> <body>)"))
      (om-set-text editor (lisp-exp self))
      (om-add-menu-to-win editor)
      editor))
+|#
+
+(defmethod edit-existing-lambda-expression ((self ompatch))
+  (let ((editor (om-make-window 'patch-lambda-exp-window
+                                :patchref self
+                                :size (om-make-point 300 200)
+                                :window-title (string+ "Lisp Patch - " (name self))
+                                :window-show nil)))
+    (om-set-text editor (lisp-exp self))
+    (om-add-menu-to-win editor)
+    (apply-saved-lisp-zoom editor self)
+    editor))
 
 
+(defmethod oa::editor-window-font ((self patch-lambda-exp-window))
+  om-lisp::*om-lisp-patch-font*)
 
