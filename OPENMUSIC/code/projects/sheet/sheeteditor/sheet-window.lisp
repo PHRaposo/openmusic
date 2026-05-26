@@ -172,10 +172,12 @@
   (update-subviews (panel self)))
 
 
-(defclass sheet-scorepanel (scorepanel) 
+(defclass sheet-scorepanel (scorepanel)
   ((timebpf :accessor timebpf :initarg :timebpf :initform nil)
    (trackpanels :accessor trackpanels :initarg :trackpanels :initform nil))
   (:default-initargs :draw-with-buffer t))
+
+(defmethod om-zoom-applies-p ((pane sheet-scorepanel)) nil)
 
 (defclass sheet-titlebar (editor-titlebar) 
   ((currtime :accessor currtime :initarg :currtime :initform 0)

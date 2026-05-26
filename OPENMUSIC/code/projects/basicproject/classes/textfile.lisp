@@ -307,9 +307,12 @@ As output it returns the contents of the text buffer as a list formatted accordi
 ;;; TEXT EDITOR IS A SPECIAL CASE OF EDITOR 
 ;;; DIRECTLY MANAGED BY OM-API
 
-(defclass TextEditorWindow (om-text-edit-window) 
+(defclass TextEditorWindow (om-text-edit-window)
    ((object :initform nil :initarg :object :accessor object)
     (ref :initform nil :initarg :ref :accessor ref)))
+
+(defmethod oa::editor-window-input-model ((self TextEditorWindow))
+  (oa::om-zoom-input-entries))
 
 (defmethod editor ((self TextEditorWindow)) self)
 

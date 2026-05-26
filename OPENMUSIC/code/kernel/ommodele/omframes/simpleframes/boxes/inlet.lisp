@@ -365,7 +365,6 @@
 (defmethod copy ((self text-enter-view)) nil)
 (defmethod paste ((self text-enter-view)) nil)
 
-#|
 ;;;new : text-view is on the panel
 (defmethod exit-from-dialog ((self edit-text-enter-view) newtext)
   (handler-bind ((error #'(lambda (c) (declare (ignore c))
@@ -382,45 +381,6 @@
          (setf (value fun-input) (read-from-string newtext)))
        (setf (text-view (editor (om-view-container self))) nil)
        (om-remove-subviews (panel (editor (om-view-container self))) self))))
-|#
-
-;;;new : text-view is on the panel
-(defmethod exit-from-dialog ((self edit-text-enter-view) newtext)
-  (let* ((fun-input (object (object self)))
-         (keyword?  (keyword-input-p fun-input)))
-    (cond
-     (keyword?
-      (handler-bind ((error #'(lambda (c)
-                                (format *om-stream*
-                                        "~&[exit-from-dialog edit-text/keyword ERROR] ~A~%   condition-type=~S~%"
-                                        (princ-to-string c) (type-of c))
-                                (finish-output *om-stream*)
-                                (om-dismiss-ttybox-view self)
-                                (om-beep)
-                                (om-abort))))
-        (let ((*package* (find-package :om)))
-          (set-new-keyword fun-input newtext)
-          (om-view-set-help (object self)
-                            (string+ "<" (string-downcase (name (object (object self)))) "> "))
-          (setf (text-view (editor (om-view-container self))) nil)
-          (om-remove-subviews (panel (editor (om-view-container self))) self))))
-     ((not (om-str-parseable-as-lisp-p newtext))
-      (om-dismiss-ttybox-view self)
-      (om-warn-unreadable-materialize)
-      (om-abort))
-     (t
-      (handler-bind ((error #'(lambda (c)
-                                (format *om-stream*
-                                        "~&[exit-from-dialog edit-text/value ERROR] ~A~%   condition-type=~S~%"
-                                        (princ-to-string c) (type-of c))
-                                (finish-output *om-stream*)
-                                (om-dismiss-ttybox-view self)
-                                (om-beep)
-                                (om-abort))))
-        (let ((*package* (find-package :om)))
-          (setf (value fun-input) (read-from-string newtext))
-          (setf (text-view (editor (om-view-container self))) nil)
-          (om-remove-subviews (panel (editor (om-view-container self))) self)))))))
 
 ;-------------------------------------------
 

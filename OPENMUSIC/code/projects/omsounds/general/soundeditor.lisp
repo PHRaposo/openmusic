@@ -522,12 +522,14 @@
 ;;; PANEL 
 ;;;=======
 
-(defclass soundPanel (om-scroller view-with-ruler-x cursor-play-view-mixin om-view-drag) 
+(defclass soundPanel (om-scroller view-with-ruler-x cursor-play-view-mixin om-view-drag)
   ((mode :initform 0 :accessor mode)
    (selection? :initform nil :accessor selection?)
    (bounds-x :initform '(0 1) :accessor bounds-x :initarg :bounds-x))
   (:default-initargs
    #+win32 :draw-with-buffer #+win32 t))
+
+(defmethod om-zoom-applies-p ((pane soundPanel)) nil)
 
 ;;; temp compatibility
 (defmethod (setf cursor-p) (val (self soundpanel))

@@ -383,7 +383,7 @@
 ;------------------------------------
 
 
-(defclass arraypanel (om-scroller view-with-ruler-x) 
+(defclass arraypanel (om-scroller view-with-ruler-x)
   ((mode :initform :normal :accessor mode)
    (panel-list :initform nil :initarg :panel-list :accessor panel-list)
    (c-panel-list :initform nil :initarg :c-panel-list :accessor c-panel-list)   ;;; not used anymore...
@@ -393,6 +393,7 @@
    (bpf-views :initform nil :accessor bpf-views))
   (:default-initargs :scrollbars :v :retain-scrollbars t))
 
+(defmethod om-zoom-applies-p ((pane arraypanel)) nil)
 
 (defmethod multibpf? ((self arraypanel)) nil)
 (defmethod show-position ((self t)) nil)

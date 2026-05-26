@@ -225,9 +225,11 @@ Packages panels contains icons of sub-packages, classes and sometimes slots.#end
 ;PANEL 2 : functions / classes 
 ;------------------------------------
 
-(defclass PackageContentsPanel (metaobj-panel) 
+(defclass PackageContentsPanel (metaobj-panel)
               ((funpanel :accessor funpanel :initarg :funpanel :initform nil)
                (clsspanel :accessor clsspanel :initarg :clsspanel :initform nil)))
+
+(defmethod om-zoom-applies-p ((pane PackageContentsPanel)) nil)
 
 (defmethod get-subframes ((self PackageContentsPanel))
   (append (get-subframes (funpanel self)) (get-subframes (clsspanel self))))

@@ -792,12 +792,14 @@ Workspace Panels contain icons of patches, maquettes and folders
 
 (defclass folderPanel (nonRelationPanel) ()
 
-              #+(and win32 (not ml-maquette)) 
+              #+(and win32 (not ml-maquette))
               (:default-initargs :draw-pinboard-objects :local-buffer)
 
 	      (:documentation "This is the class for folder'editors.
 Elements in these editors are patch-icon-frame maquette-icon-frame or folder-icon-frame instances.#enddoc#
 #seealso# (OMFolder patch-icon-frame maquette-icon-frame folder-icon-frame) #seealso#"))
+
+(defmethod om-zoom-applies-p ((pane folderPanel)) nil)
 
 
 (defmethod set-panel-color ((self folderPanel))
@@ -893,10 +895,12 @@ Elements in these editors are patch-icon-frame maquette-icon-frame or folder-ico
 
 (defclass GlobalsfolderPanel (nonRelationPanel)
    ((scroll-scrap-glo :initform nil :allocation :class :accessor scroll-scrap-glo))
-   (:documentation "This is the class for OMGlobalsFolder'editors. 
+   (:documentation "This is the class for OMGlobalsFolder'editors.
 Elements in these editors are instance-icon-frame instances.#enddoc#
 #seealso# (OMglobalsFolder instance-icon-frame) #seealso#
 #scroll-scrap-glo# Used to distinguish for the OMfolder scrap. #scroll-scrap-glo#"))
+
+(defmethod om-zoom-applies-p ((pane GlobalsfolderPanel)) nil)
 
 (defmethod omG-new-var ((self GlobalsfolderPanel))
    "Make a new global instance of the class store."
@@ -1037,12 +1041,14 @@ Elements in these editors are instance-icon-frame instances.#enddoc#
 
 (defclass GenericFunPanel (nonRelationPanel) ()
 
-              #+(and win32 (not ml-maquette)) 
+              #+(and win32 (not ml-maquette))
               (:default-initargs :draw-pinboard-objects :local-buffer)
 
 	      (:documentation "This is the class for editor of Generic Functions meta objects.
  Elements of these editors are icon-method instances.#enddoc#
 #seealso# (OMgenericFunction icon-method) #seealso#"))
+
+(defmethod om-zoom-applies-p ((pane GenericFunPanel)) nil)
 
 
 (defmethod set-panel-color ((self GenericFunPanel))

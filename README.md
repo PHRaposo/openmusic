@@ -38,8 +38,21 @@ This branch introduces an **experimental** zoom feature for OM editors. The impl
 - Maquette editor — keeps its own native zoom; the generic zoom bar does not apply.
 - Box icons (miniviews) in the patch — scale with the parent patch zoom (e.g. BPF, BPC, board, array, sound).
 - Music editor (Note, Chord, Chord-Seq, Multi-Seq, Voice, Poly) — musical font size scales with gestures, shortcuts and the bar pop-up. Native horizontal zoom (staff spacing) remains on the bar numbox.
+- Lisp Editor (Windows menu) and OMLispPatch / OMLispPatchAbs — text font scales with `Ctrl +/-/0` and pinch. OMLispPatch zoom is persisted in the `.oml` body (and in the parent `.omp` for OMLispPatchAbs).
+- TextFile box editor — text font scales with `Ctrl +/-/0` and pinch (per-session, no persistence yet).
+- Box materialization on edit — when you create a box by double-clicking the patch and typing free text, you can now re-edit that text later and the box will materialize into the matching function, generic function, class, or built-in keyword box. Previously, a typo or a wrong name forced you to delete the box and start over.
 - Fluid interface boxes and dialog-item interface boxes — partial. **todo**: complete fixes.
 - **todo**: extend zoom to other editors.
+
+### Editors explicitly excluded from zoom
+
+The following editors have `om-zoom-applies-p → nil` (or do not inherit from `om-scroller`), so pinch and `Ctrl +/-/0` are inert in their windows. Their box icons / miniviews in the parent patch still scale with the parent zoom.
+
+- BPF, BPC, array, sound, sheet, picture, board
+- `OMTablebox`
+- `OMFolder`, `OMglobalsFolder`, `OMPackage`, `OMhelpFolder`
+- `OMGenericFunction` (the methods-grid window; the `methodEditor` patch where each method is defined is zoom-aware)
+- `MaquettePanel`, `InstancePanel` (kept their pre-existing opt-out)
 
 
 ## Sources and Licensing
