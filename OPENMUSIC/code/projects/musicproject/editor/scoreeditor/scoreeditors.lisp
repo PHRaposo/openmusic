@@ -26,6 +26,10 @@
 
 (in-package :om)
 
+;;; Zoom categories in this file:
+;;;   - ZOOM-UI:    score-native zoom via staff-zoom slot + zoom-numbox widget
+;;;                 (independent from the generic om-zoom-of canvas zoom)
+;;;   - ZOOM-INPUT: scorePanel Ctrl+= / Ctrl+- / Ctrl+0 keyboard shortcuts
 
 ;======================================================
 ;VIEW   abstract class
@@ -590,6 +594,7 @@
   (loop for item in *scales-list* collect (list (third item) (car item))))
 
 
+;; ZOOM-UI: hook for control views that need zoom-aware font widgets.
 (defgeneric make-mus-font-widget (control-view panel position font font-size-init)
   (:documentation "Build the font-size widget for CONTROL-VIEW. Default = legacy pop-up; specialize for zoom-aware variants."))
 
@@ -837,6 +842,8 @@
                                          :bg-color *controls-color*))))
 |#
 
+;;; ===== Zoom support: score zoom numbox UI =====
+;;; Category: ZOOM-UI
 (defun add-zoom2control (control zoom &optional position)
   (setf zoom (if zoom (round (* zoom 100)) 100))
   (let* ((pos (or (om-add-points position (om-make-point 3 2))
@@ -864,6 +871,7 @@
   (let* ((ed  (and (typep panel 'om-graphic-object) (editor panel)))
          (ctr (and ed (slot-exists-p ed 'ctr-view) (ctr-view ed))))
     (and ctr (slot-exists-p ctr 'zoom-numbox) (zoom-numbox ctr))))
+;;; ===== End zoom support =====
 
 (defmethod additional-port-menu ((self t) &key (pos (om-make-point 410 1)) (color *om-white-color*) (in t) (out t))
   (when in
@@ -958,6 +966,7 @@
     (staff-sys :initform 'ggff :initarg :staff-sys :accessor staff-sys)
     (staff-mode :initform 0  :initarg :staff-mode :accessor staff-mode)
     (staff-tone :initform 2 :initarg :staff-tone :accessor staff-tone)
+    ;; ZOOM-UI: score-native zoom factor (independent from om-zoom-of).
     (staff-zoom :initform 1 :initarg :staff-zoom :accessor staff-zoom)
     (staff-onset :initform 0 :initarg :staff-onset :accessor staff-onset)
     (staff-meas :initform 1 :initarg :staff-meas :accessor staff-meas)
@@ -1158,6 +1167,7 @@
            (:om-key-tab (change-obj-mode self 1))
           ; (#\r (get-score-tree self)) ;;wait for score-box distribution fix
            (t (call-next-method))))
+        ;; ZOOM-INPUT: Ctrl+= / Ctrl+- step staff-zoom by 1.1; Ctrl+0 resets to 100%.
         ((om-command-key-p)
          (cond
           ((or (equal char #\=) (equal char #\+))

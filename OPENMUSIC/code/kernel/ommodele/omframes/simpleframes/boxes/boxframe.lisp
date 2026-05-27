@@ -522,6 +522,7 @@
    (toggle-icon-active-mode self))
 
 
+;; ZOOM-CTX: bound during drag to skip LOGICAL->VISUAL recompute.
 (defvar *om-zoom-drag-visual-pos* nil
   "When bound, pins CAPI to the exact dragged pixel and skips
 LOGICAL->VISUAL recompute (avoids double-round drift).")
@@ -565,6 +566,7 @@ LOGICAL->VISUAL recompute (avoids double-round drift).")
   (centre-icon self))
 |#
 
+;; ZOOM-CTX: guard so zoom relayout doesn't mark the box as user-resized.
 (defvar *om-zoom-internal-resize* nil
   "When T, om-set-view-size skips the frame-size setf so a zoom relayout
 does not mark the box as user-resized.")
@@ -608,6 +610,8 @@ does not mark the box as user-resized.")
     (call-next-method self visual))
   (centre-icon self))
 
+;;; ===== Zoom support: omboxframe relayout =====
+;;; Category: ZOOM-UI
 (defmethod om-zoom-redraw-connections ((frame omboxframe))
   (redraw-connections frame))
 
@@ -631,6 +635,7 @@ does not mark the box as user-resized.")
                         (error (c) (om-zoom-log-error :relayout-minipict-access c) nil))))
         (handler-case (update-miniview iv (value obj))
           (error (c) (om-zoom-log-error :relayout-refresh-minipict c)))))))
+;;; ===== End zoom support =====
 
 
 #|

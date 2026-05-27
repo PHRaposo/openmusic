@@ -75,6 +75,7 @@
           (om-make-point x y)))
       (om-make-point 0 0)))
 
+;; ZOOM-COORD: unscale mouse position when *om-zoom-unscale-mouse-pos-p* is bound.
 (defun om-zoom-mouse-pos-maybe-unscale (view raw)
   "Return RAW divided by VIEW's effective zoom when
 *om-zoom-unscale-mouse-pos-p* is bound T; return RAW otherwise."
@@ -90,12 +91,14 @@
 
 ;(defmethod om-mouse-position ((view om-graphic-object))
 ;  (internal-mouse-position view))
+;; ZOOM-COORD: route through unscale helper.
 (defmethod om-mouse-position ((view om-graphic-object))
   (om-zoom-mouse-pos-maybe-unscale view (internal-mouse-position view)))
 
 ;(defmethod om-mouse-position ((view om-item-view))
 ;  (om-convert-coordinates (internal-mouse-position (item-container view))
 ;                          (item-container view) view))
+;; ZOOM-COORD: route through unscale helper.
 (defmethod om-mouse-position ((view om-item-view))
   (om-zoom-mouse-pos-maybe-unscale view
     (om-convert-coordinates (internal-mouse-position (item-container view))

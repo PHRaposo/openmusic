@@ -30,6 +30,9 @@
 
 (in-package :om)
 
+;;; Zoom categories in this file:
+;;;   - ZOOM-SCALE: fluid interface-box update-di-size scales position + font per container zoom
+;;;   - ZOOM-CTX:   om-zoom-logical-font stamped on widgets
 
 ;=========================
 ; FLUID MICRO TUNE

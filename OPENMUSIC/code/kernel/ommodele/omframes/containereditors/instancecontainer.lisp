@@ -318,9 +318,12 @@ Elements of these editors are instance-icon-frame instances.#enddoc#
         ))))
 
 
+;;; ===== Zoom support: InstancePanel opt-out =====
+;;; Category: ZOOM-UI
 ;; Icon browser: opts out of the canvas zoom (see nonrelationcontainer.lisp).
 (defmethod om-zoom-of ((pane InstancePanel)) 1.0)
 (defmethod (setf om-zoom-of) (value (pane InstancePanel))
   (declare (ignore value)) 1.0)
 
 (defmethod om-zoom-applies-p ((pane InstancePanel)) nil)
+;;; ===== End zoom support =====

@@ -25,7 +25,10 @@
 
 
 (in-package :om)
- 
+
+;;; Zoom categories in this file:
+;;;   - ZOOM-SCALE: music miniview drawing scales font and margins with ancestor zoom
+
 ;=======
 
 (defmethod edition-values   ((self miniview))

@@ -114,6 +114,7 @@
 
      (set-icon-pos copy ,(om-copy-point (get-icon-pos self)))
      (set-win-size copy ,(om-copy-point (get-win-size self)))
+     ;; ZOOM-PERSIST: carry zoom across omNG-copy.
      (set-win-zoom copy ,(get-win-zoom self))
      (setf (omversion copy) ,(omversion self))
      (setf (pictu-list copy) ',(mapcar 'copy-picture (pictu-list self)))

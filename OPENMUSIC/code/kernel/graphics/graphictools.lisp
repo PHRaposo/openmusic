@@ -311,6 +311,7 @@
                                                                                     (om-subtract-points pp2 pp1)))
                                                )
                                              |#
+                                             ;; ZOOM-COORD: unscale resize delta to logical box size.
                                              (let* ((z (om-zoom-effective boxframe))
                                                     (new-vis-size (om-add-points (om-view-size boxframe)
                                                                                  (om-subtract-points pp2 pp1)))

@@ -232,6 +232,7 @@
 |#
 
 (defmethod draw-send-box ((container t) object)
+  ;; ZOOM-SCALE: index label offsets scale with container zoom.
   (let* ((zoom (om-zoom-effective container))
          (offx (max 1 (round (* 7  zoom))))
          (offy (max 1 (round (* 12 zoom)))))
@@ -252,6 +253,7 @@
             (newsend (make-new-send (mk-unique-name self "send") i pos t))
             )
        (omG-add-element self
+                        ;; ZOOM-CTX: propagate panel zoom to new send frame.
                         (let ((*make-frame-zoom-context*
                                (and (typep self 'om-scroller) (om-zoom-of self))))
                           (make-frame-from-callobj newsend)))
@@ -284,6 +286,7 @@
        (when target
          (setf newobj (eval (omng-replicate (object self) (borne-position new-position))))
          (omG-add-element target
+                          ;; ZOOM-CTX: propagate target zoom to receive frame from shift-drag.
                           (let ((*make-frame-zoom-context*
                                  (and (typep target 'om-scroller) (om-zoom-of target))))
                             (make-frame-from-callobj newobj)))))
@@ -469,6 +472,7 @@
 |#
 
 (defmethod draw-send-receive-box ((container t) object)
+  ;; ZOOM-SCALE: index label offsets scale with container zoom.
   (let* ((zoom (om-zoom-effective container))
          (offx (max 1 (round (* 7  zoom))))
          (offy (max 1 (round (* 12 zoom)))))

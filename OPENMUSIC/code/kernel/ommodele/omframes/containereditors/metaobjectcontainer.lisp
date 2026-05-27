@@ -30,6 +30,9 @@
 
 (in-package :om)
 
+;;; Zoom categories in this file:
+;;;   - ZOOM-COORD: convert visual positions to logical for omNG-save geometry capture
+;;;   - ZOOM-SCALE: scale logical bottom-right into visual for set-field-size
 
 ;----------------------------------
 ;PANEL

@@ -88,6 +88,7 @@
    (highlight :initform nil :accessor highlight)
    (temp-data :initform nil :accessor temp-data)
    (images :initarg :images :accessor images :initform nil)
+   ;; ZOOM-CTX: per-frame logical snapshots, set lazily on first zoom.
    (om-zoom-logical-pos  :initform nil :accessor om-zoom-logical-pos)
    (om-zoom-logical-size :initform nil :accessor om-zoom-logical-size)
    (om-zoom-logical-font :initform nil :accessor om-zoom-logical-font))
@@ -149,9 +150,8 @@
 		  (:gesture-spec om-char-spec-callback)
                   ;(:character  om-char-callback nil)
 
-                  ;; Zoom gestures; no-op when om-zoom-applies-p returns nil.
+                  ;; ZOOM-INPUT: touch gesture bindings (Cocoa/Win32 only).
                   ((:touch :zoom)   om-zoom-touch-handler)
-                  ;; Win32: shift+wheel arrives as :touch :rotate.
                   #+win32 ((:touch :rotate) om-zoom-shift-wheel-handler)
                   ((:touch :swipe)  om-zoom-touch-swipe-handler)
                   #+win32 ((:touch :pan) om-zoom-touch-pan-handler)

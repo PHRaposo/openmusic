@@ -792,6 +792,7 @@ The matrix \"components\" can be accessed and modified using the functions get-c
                 ))))))))
 |#
 
+;; ZOOM-SCALE: pen scales with view zoom; *om-zoom-mini-helper-scale* propagates to draw helpers.
 (defmethod draw-obj-in-rect ((self class-array) x x1 y y1 edparams view)
   (let* ((zoom     (om-zoom-effective view))
          (pen      (max 1 (round zoom)))

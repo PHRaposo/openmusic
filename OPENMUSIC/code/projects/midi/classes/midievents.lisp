@@ -85,6 +85,7 @@ Lists of MIDIEvents can be extracted form other OM objects using GET-MIDIEVENTS.
 ))
 |#
 
+;; ZOOM-SCALE: font and line metrics scale with view zoom.
 (defmethod draw-obj-in-rect ((self MidiEvent) x x1 y y1 edparams view)
   (let* ((zoom        (om-zoom-effective view))
          (scale-p     (and (numberp zoom) (/= zoom 1.0)))

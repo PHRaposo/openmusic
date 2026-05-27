@@ -73,6 +73,7 @@
                 3 4 t 0))
 |#
 
+;; ZOOM-SCALE: pen and rebound fonts scale with view zoom.
 (defmethod draw-obj-in-rect ((self n-cercle) x x1 y y1 edparams view)
   (let* ((zoom    (om-zoom-effective view))
          (scale-p (and (numberp zoom) (/= zoom 1.0)))

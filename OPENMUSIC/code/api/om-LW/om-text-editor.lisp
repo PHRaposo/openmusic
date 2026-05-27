@@ -67,6 +67,9 @@
   nil)
 
 
+;;; ===== Zoom support: text-editor pane font scaling =====
+;;; Categories: ZOOM-SCALE, ZOOM-INPUT
+
 (defun ensure-font-description (font-or-desc)
   "Return a gp:font-description from either a gp:font-description (identity) or a gp:font (extract via accessor)."
   (etypecase font-or-desc
@@ -130,6 +133,7 @@
       (setf (capi::simple-pane-font pane) (rebuild-font-with-size current-desc new-size)))))
 
 
+;; ZOOM-INPUT: pinch handler for the editor-pane.
 (defun om-zoom-pane-touch-handler (pane x y scale)
   (declare (ignore x y))
   (apply-pane-font-step pane scale nil))
@@ -151,6 +155,7 @@
           (rebuild-font-with-size default-desc new-size))))
 
 
+;; ZOOM-INPUT: keyboard shortcut handlers.
 (defun om-zoom-shortcut-in (pane x y spec)
   (declare (ignore x y spec))
   (apply-pane-font-step pane 1 nil))
@@ -164,6 +169,7 @@
   (apply-pane-font-step pane 0 t))
 
 
+;; ZOOM-INPUT: input-model entries prepended by customize-text-editor-pane.
 (defun om-zoom-input-entries ()
   "Input-model entries for font zoom: 4 shortcut gesture-specs + 1 touch. Prepend to default input-model so shortcuts fire before the editor catch-all."
   `(((:gesture-spec #\= #+macosx :hyper #-macosx :control) om-zoom-shortcut-in)
@@ -171,6 +177,8 @@
     ((:gesture-spec #\- #+macosx :hyper #-macosx :control) om-zoom-shortcut-out)
     ((:gesture-spec #\0 #+macosx :hyper #-macosx :control) om-zoom-shortcut-reset)
     ((:touch :zoom) om-zoom-pane-touch-handler)))
+
+;;; ===== End zoom support =====
 
 
 (defmethod om-window-class-menubar ((self om-text-edit-window))

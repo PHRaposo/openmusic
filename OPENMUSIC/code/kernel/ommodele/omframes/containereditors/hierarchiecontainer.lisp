@@ -29,6 +29,9 @@
 
 (in-package :om)
 
+;;; Zoom categories in this file:
+;;;   - ZOOM-CTX: *make-frame-zoom-context* propagated when hierarchy editor spawns frames
+
 (defun open-new-RelationTree (object name elements)
    (let* (newwindow)
      (setf newwindow 

@@ -187,6 +187,7 @@ boxes attached to the flag, the car of each element say if the box is attached a
 |#
 
 ;;; LOGICAL geometry on the OBJECT (frame-position) is unchanged.
+;; ZOOM-SCALE: scale temp-marker frame size and position with zoom context.
 (defmethod make-frame-from-callobj ((self temp-marker))
    "Cons a simple frame for a temp-marker instance."
    (let* ((zoom (or *make-frame-zoom-context* 1.0))

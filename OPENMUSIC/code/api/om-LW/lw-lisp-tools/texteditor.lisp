@@ -494,6 +494,7 @@
 (defparameter *line-numbers* t)
 (defparameter *line-color-numbers* t)
 
+;; ZOOM-INPUT: hook for specializations to install zoom input entries.
 (defgeneric customize-text-editor-pane (win)
   (:documentation "Hook called after the editor-pane is built but before the window is displayed."))
 

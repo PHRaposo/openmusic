@@ -334,6 +334,7 @@ It allows to choose/select items of a list to be outputed."))
             (newsend (make-new-choose (mk-unique-name self "om-choose") i pos t))
             )
        (omG-add-element self
+                        ;; ZOOM-CTX: propagate panel zoom to new choose-box frame.
                         (let ((*make-frame-zoom-context*
                                (and (typep self 'om-scroller) (om-zoom-of self))))
                           (make-frame-from-callobj newchoose)))

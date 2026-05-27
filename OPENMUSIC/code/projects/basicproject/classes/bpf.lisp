@@ -24,7 +24,11 @@
 
 (in-package :om)
 
-(defclass object-with-pict () 
+;;; Zoom categories in this file:
+;;;   - ZOOM-SCALE: draw-obj-in-rect / draw-mini-view scale pen and margins with view zoom
+;;;   - ZOOM-CTX:   *om-zoom-mini-helper-scale* propagates zoom into helper draw routines
+
+(defclass object-with-pict ()
   ((pict :accessor pict :initform nil)))
  
 (defclass internalbpf (named-object object-with-pict select-object object-in-box)

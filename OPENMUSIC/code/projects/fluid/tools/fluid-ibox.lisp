@@ -30,6 +30,10 @@
 
 (in-package :om)
 
+;;; Zoom categories in this file:
+;;;   - ZOOM-SCALE: dialog-item position, size and font scaled per panel zoom
+;;;   - ZOOM-CTX:   om-zoom-logical-font / -size stamped on widgets
+
 ;============================
 ;FLUID Dialog item boxes
 ;============================

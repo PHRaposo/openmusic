@@ -393,6 +393,7 @@
    (bpf-views :initform nil :accessor bpf-views))
   (:default-initargs :scrollbars :v :retain-scrollbars t))
 
+;; ZOOM-UI: arraypanel opts out of generic canvas zoom.
 (defmethod om-zoom-applies-p ((pane arraypanel)) nil)
 
 (defmethod multibpf? ((self arraypanel)) nil)

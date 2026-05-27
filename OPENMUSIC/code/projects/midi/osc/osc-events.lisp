@@ -66,6 +66,7 @@ Note: default host 127.0.0.1 is the 'localhost', i.e. the message is send to the
 ))
 |#
 
+;; ZOOM-SCALE: font and line metrics scale with view zoom.
 (defmethod draw-obj-in-rect ((self OSCEvent) x x1 y y1 edparams view)
   (let* ((zoom        (om-zoom-effective view))
          (scale-p     (and (numberp zoom) (/= zoom 1.0)))

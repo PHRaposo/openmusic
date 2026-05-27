@@ -23,6 +23,10 @@
 
 (in-package :om)
 
+;;; Zoom categories in this file:
+;;;   - ZOOM-PERSIST: w-zoom slot serialized in load-textfile/load-buffer-textfile body
+;;;   - ZOOM-PERSIST: capture-textfile-window-zoom / apply-saved-textfile-zoom helpers
+;;;   - ZOOM-SCALE:   draw-obj-in-rect scales font with view zoom
 
 ;-------------
 ;TEXTFILE CLASS

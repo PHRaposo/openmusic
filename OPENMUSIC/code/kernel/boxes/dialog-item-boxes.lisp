@@ -24,6 +24,10 @@
 
 (in-package :om)
 
+;;; Zoom categories in this file:
+;;;   - ZOOM-SCALE: dialog-item update-di-size scales position + font with container zoom
+;;;   - ZOOM-CTX:   om-zoom-logical-font / -size stamped on widgets
+
 ;============================
 ;Dialog item boxes
 ;============================

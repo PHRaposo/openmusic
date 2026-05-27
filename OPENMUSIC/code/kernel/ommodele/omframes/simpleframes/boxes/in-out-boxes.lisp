@@ -88,6 +88,7 @@
 
 ;;; (w module) / (h module) are already VISUAL.
 (defmethod make-basic-output ((self t) module)
+   ;; ZOOM-SCALE: io-size and offsets honor the make-frame zoom context.
    (let* ((zoom    (or *make-frame-zoom-context* 1.0))
           (scale-p (and (numberp zoom) (/= zoom 1.0)))
           (io-size (if scale-p (max 1 (round (* 8 zoom))) 8))
@@ -218,6 +219,7 @@
      (let* ((obj (object self))
             (container (om-view-container self))
             (newin (make-new-typed-input (name obj) thetype (indice obj) (frame-position obj)))
+            ;; ZOOM-CTX: propagate container zoom so replacement frame inherits scale.
             (frame (let ((*make-frame-zoom-context*
                           (and (typep container 'om-scroller) (om-zoom-of container))))
                      (make-frame-from-callobj newin))))
@@ -254,6 +256,7 @@
 |#
 
 (defmethod draw-typed-special ((self typedinframe))
+  ;; ZOOM-SCALE: index label offsets scale with effective zoom.
   (let* ((zoom (om-zoom-effective self))
          (offx (round (* 4 zoom)))
          (offy (round (* 8 zoom))))
@@ -275,6 +278,7 @@
                        (find-class (reference (object self)))
                        (borne-position new-position) (mk-unique-name target "slot")))
          (omG-add-element target
+                          ;; ZOOM-CTX: propagate target zoom into slot-box frame.
                           (let ((*make-frame-zoom-context*
                                  (and (typep target 'om-scroller) (om-zoom-of target))))
                             (make-frame-from-callobj newobj)))))
@@ -675,6 +679,7 @@
 |#
 
 (defmethod draw-in-inout-box ((container t) object)
+  ;; ZOOM-SCALE: index label offsets scale with container zoom.
   (let* ((zoom (om-zoom-effective container))
          (offx (round (* 7 zoom)))
          (offy (round (* 12 zoom))))

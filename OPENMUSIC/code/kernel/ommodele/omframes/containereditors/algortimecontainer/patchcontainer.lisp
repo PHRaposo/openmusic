@@ -330,6 +330,7 @@ because digit-char-p will not accept backspace and special om keys!"
 (defvar *cur-eval-panel* nil)
 
 (defmethod handle-key-event ((self patchPanel) char)
+  ;; ZOOM-INPUT: Ctrl+= / Ctrl+- step by 1.1, Ctrl+0 resets.
   (when (and (om-command-key-p) (om-zoom-applies-p self))
     (cond
      ((or (equal char #\=) (equal char #\+))
@@ -876,6 +877,8 @@ The order of listed boxes is spatial, ie. from left to right."
 (defmethod add-output-enabled ((self patchpanel) type) t)
 
 
+;;; ===== Zoom support: visual->logical viewport helper =====
+;;; Category: ZOOM-COORD
 (defun om-zoom-viewport-logical (pane)
   "Return four LOGICAL values (pre-zoom) describing the visible viewport of PANE:
    sx-log sy-log vw-log vh-log
@@ -895,6 +898,7 @@ The order of listed boxes is spatial, ie. from left to right."
                 (round (* sy k))
                 (max 1 (round (* (or vw (vw pane)) k)))
                 (max 1 (round (* (or vh (vh pane)) k))))))))
+;;; ===== End zoom support =====
 
 
 #|
@@ -1562,9 +1566,8 @@ Elements of the list are list as (source-position source-output target-position 
                      (change-boxframe-size (car (frames (object ob))) (om-make-point x y)))))))
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Zoom editor bar (hosts in/out buttons and a percent numbox)
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; ===== Zoom support: editor bar (hosts in/out buttons and a percent numbox) =====
+;;; Categories: ZOOM-UI, ZOOM-INPUT
 
 (defclass om-patch-editor-bar (om-view) ())
 
@@ -1694,6 +1697,7 @@ Elements of the list are list as (source-position source-output target-position 
     (when (and patch (typep patch 'OMPersistantObject)
                (not (capi:capi-object-property pane :om-zoom-restoring-p)))
       (set-win-zoom patch factor))))
+;;; ===== End zoom support =====
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

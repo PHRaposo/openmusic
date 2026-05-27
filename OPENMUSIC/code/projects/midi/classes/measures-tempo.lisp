@@ -115,6 +115,7 @@ A TEMPO-MAP represents the tempo events and measure changes (also used as bar ma
            ))))
 |#
 
+;; ZOOM-SCALE: font and margins scale with view zoom.
 (defmethod draw-obj-in-rect ((self Tempo-Map) x x1 y y1 edparams view)
   (let* ((zoom    (om-zoom-effective view))
          (scale-p (and (numberp zoom) (/= zoom 1.0)))

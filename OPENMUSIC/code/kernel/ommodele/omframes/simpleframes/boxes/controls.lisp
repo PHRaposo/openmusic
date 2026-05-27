@@ -215,6 +215,7 @@
                     (remove #\Newline (initial-text-ttybox self))))
 	 (panel (om-view-container (om-view-container self)))
 	 (container (editor panel))
+         ;; ZOOM-SCALE: scale dialog font to match panel zoom.
          (zoom (if (typep panel 'om-scroller) (om-zoom-of panel) 1.0))
          (font (if (= zoom 1.0) *om-default-font1* (om-zoom-scale-font *om-default-font1* zoom))))
     (when (text-view container)
@@ -307,6 +308,7 @@
            (theeditor (editor box-frame)))
       (cond
        ((box-would-materialize-p newval)
+        ;; ZOOM-COORD: unscale visual position back to logical for add-box-in-patch-panel.
         (let* ((zoom (if (typep scroller 'om-scroller) (om-zoom-of scroller) 1.0))
                (pos (om-view-position box-frame))
                (logical-pos (if (= zoom 1.0) pos (om-zoom-unscale-point pos zoom))))
@@ -446,6 +448,7 @@
     (let* ((box (om-view-container (object self)))
            (scroller (om-view-container box))
            (theeditor (editor (om-view-container box)))
+           ;; ZOOM-COORD: unscale visual position back to logical for add-box-in-patch-panel.
            (zoom (if (typep scroller 'om-scroller) (om-zoom-of scroller) 1.0))
            (pos (let ((vp (om-view-position box)))
                   (if (= zoom 1.0) vp (om-zoom-unscale-point vp zoom)))))
@@ -526,6 +529,7 @@
            (pos (om-view-position box))
            (scroller (om-view-container box))
            (theeditor (editor (om-view-container box)))
+           ;; ZOOM-COORD: unscale visual position back to logical for add-box-in-patch-panel.
            (zoom (if (typep scroller 'om-scroller) (om-zoom-of scroller) 1.0))
            (logical-pos (if (= zoom 1.0) pos (om-zoom-unscale-point pos zoom))))
       (unwind-protect
@@ -611,6 +615,7 @@
         (set-patch-box-name newbox text))
       
       (omG-add-element scroller
+                       ;; ZOOM-CTX: propagate scroller zoom to new frame creation.
                        (let ((*make-frame-zoom-context*
                               (and (typep scroller 'om-scroller) (om-zoom-of scroller))))
                          (make-frame-from-callobj newbox))))

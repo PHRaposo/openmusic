@@ -29,6 +29,11 @@
 
 (in-package :om)
 
+;;; Zoom categories in this file:
+;;;   - ZOOM-COORD: visual drop position unscaled to logical for storage
+;;;   - ZOOM-CTX:   *make-frame-zoom-context* propagated to new frames
+;;;   - ZOOM-CTX:   *om-zoom-drag-visual-pos* pins CAPI to dragged pixel
+
 ;===========================================================================
 ;Drag&Drop Graphic actions
 ;===========================================================================

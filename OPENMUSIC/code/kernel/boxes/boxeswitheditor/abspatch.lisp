@@ -30,6 +30,9 @@
 
 (in-package :om)
 
+;;; Zoom categories in this file:
+;;;   - ZOOM-CTX: *make-frame-zoom-context* propagated when box class is changed
+
 ;==================THE BOX patch CLASS=======================
 (defclass OMBoxAbsPatch (OMBoxPatch) ()
    (:documentation "Boxes having a OMPatchAbs as reference are instances of this class. #enddoc#

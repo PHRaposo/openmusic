@@ -123,6 +123,7 @@
          frame)
     (setf (posy in) (om-point-v maqpos))
     (setf (offset in) (om-point-h maqpos))
+    ;; ZOOM-CTX: propagate maquette zoom to new input frame.
     (setf frame (let ((*make-frame-zoom-context*
                        (and (typep self 'om-scroller) (om-zoom-of self))))
                   (make-frame-from-callobj in)))
@@ -139,6 +140,7 @@
          frame)
     (setf (posy out) (om-point-v maqpos))
     (setf (offset out) (om-point-h maqpos))
+    ;; ZOOM-CTX: propagate maquette zoom to new output frame.
     (setf frame (let ((*make-frame-zoom-context*
                        (and (typep self 'om-scroller) (om-zoom-of self))))
                   (make-frame-from-callobj out)))

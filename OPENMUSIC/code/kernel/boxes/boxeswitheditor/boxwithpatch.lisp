@@ -33,6 +33,7 @@
 ;========BOXES WITH EDITOR===================
 (defclass patchForBox (OMPatch)
    ((box :initform nil :accessor box)
+    ;; ZOOM-PERSIST: per-instance zoom serialized via om-load-boxwithed1.
     (w-zoom :accessor w-zoom :initform 1.0))
    (:documentation "Some boxes as omloop have a patch that define the meaning of the box.
 This class is the abstract class for these patches.  #enddoc#
@@ -85,6 +86,7 @@ This class is the abstract class for these boxes.  #enddoc#
                                        i (om-make-point (+ 5 (* i 30)) 40))))
      (if container
        (omG-add-element container
+                        ;; ZOOM-CTX: propagate container zoom to new patch-input frame.
                         (let ((*make-frame-zoom-context*
                                (and (typep container 'om-scroller) (om-zoom-of container))))
                           (make-frame-from-callobj input)))
@@ -140,10 +142,12 @@ This class is the abstract class for these boxes.  #enddoc#
      (eval `(,(reference self) ,.in-list ,(code (patch self))))))
 
 
+;;; ===== Zoom support: patchForBox accessors =====
 (defmethod get-win-zoom ((self patchForBox)) (w-zoom self))
 
 (defmethod set-win-zoom ((self patchForBox) zoom)
   (setf (w-zoom self) zoom))
+;;; ===== End zoom support =====
 
 #|
 (defmethod omNG-save ((self box-with-patch) &optional (values? nil))
@@ -161,10 +165,12 @@ This class is the abstract class for these boxes.  #enddoc#
           (value (when values? (omNG-save (value self) values?)))
           (boxes (boxes (patch self))) pictlist)
      (setf pictlist (omng-save (pictu-list (patch self))))
+     ;; ZOOM-PERSIST: capture live panel zoom into the patch slot before saving.
      (when (editorframe (patch self))
        (let ((p (panel (editorframe (patch self)))))
          (when (and p (typep p 'om-scroller))
            (set-win-zoom (patch self) (om-zoom-of p)))))
+     ;; ZOOM-PERSIST: emit zoom as trailing arg of om-load-boxwithed1.
      `(om-load-boxwithed1 'box-with-win ,(name self) ',(reference self) ',inputs ,(om-save-point (frame-position self))
                          ,(om-save-point (frame-size self)) ,value ,(allow-lock self)
                          ,(omNG-save boxes) ',(mk-connection-list boxes) ,(numouts self) ,(frame-name self) ,pictlist
@@ -189,6 +195,7 @@ This class is the abstract class for these boxes.  #enddoc#
     (remk-connections (boxes (patch newbox)) (loop for i in conec collect (load-connection i)))
     (setf (numouts newbox) numouts)
     (setf (pictu-list (patch newbox)) pictlist)
+    ;; ZOOM-PERSIST: apply zoom from saved form (guarded against legacy nil).
     (when (and wzoom (numberp wzoom)) (setf (w-zoom (patch newbox)) wzoom))
     (push (patch newbox) *loaading-stack*)
     newbox))

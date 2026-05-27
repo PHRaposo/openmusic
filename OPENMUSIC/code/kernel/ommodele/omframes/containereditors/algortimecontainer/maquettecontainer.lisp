@@ -480,6 +480,8 @@
 #seealso# (OMMaquette tempobjframe temporalbox) #seealso#")
    )
 
+;;; ===== Zoom support: MaquettePanel opt-out =====
+;;; Category: ZOOM-UI
 ;; Maquette has its own native zoom (rangex/rangey + cursor-mode :zoom).
 ;; Pin the generic per-pane factor to 1.0 to opt out of the canvas zoom.
 (defmethod om-zoom-of ((pane MaquettePanel)) 1.0)
@@ -487,6 +489,7 @@
   (declare (ignore value)) 1.0)
 
 (defmethod om-zoom-applies-p ((pane MaquettePanel)) nil)
+;;; ===== End zoom support =====
 
 (defmethod delete-general :after ((self maquettepanel))
   (when (and (patchview (editor self)) (selected (patchview (editor self))))

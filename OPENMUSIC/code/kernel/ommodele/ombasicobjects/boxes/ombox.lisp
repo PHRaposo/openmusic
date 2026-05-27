@@ -81,6 +81,7 @@ in relation with the reference.#reference#
 (defgeneric make-frame-from-callobj (box)
    (:documentation "Cons the frame that visualize the object 'box'."))
 
+;; ZOOM-CTX: bound around make-frame-from-callobj to the destination panel's zoom.
 (defvar *make-frame-zoom-context* nil
   "Bound around make-frame-from-callobj to the destination panel's zoom.")
 
@@ -136,6 +137,7 @@ in relation with the reference.#reference#
          (index 0)
          (size-name (round (get-name-size name boxnamefont)))
          (h-name (if name (+ 3 (om-string-h boxnamefont)) 0))
+         ;; ZOOM-SCALE: pick up destination panel zoom for new-frame metrics.
          (zoom (or *make-frame-zoom-context* 1.0))
          (scale-p (and (numberp zoom) (/= zoom 1.0)))
          input-frames module boxframex)
@@ -185,6 +187,7 @@ in relation with the reference.#reference#
       (setf (outframes module) (reverse (outframes module)))
       (setf (name module) name)
       (setf (frames self) (list module))
+      ;; ZOOM-CTX: stamp logical metrics on the frame.
       ;; Stamp LOGICAL on the FRAME (not on the OBJECT) so frame-size of
       ;; OBJECT stays NIL until the user resizes; otherwise draw-before-box
       ;; would draw the gray rect on a fresh box.
@@ -258,6 +261,7 @@ in relation with the reference.#reference#
   ;; (w module) and (h module) are already VISUAL (module was built with
   ;; pre-scaled :size in make-frame-from-callobj); only the literal offsets
   ;; (4, 9) and io-size (8) need scaling.
+  ;; ZOOM-SCALE: literal offsets (4, 9) and io-size (8) scale with zoom.
   (let* ((numouts (numouts self))
          (zoom    (or *make-frame-zoom-context* 1.0))
          (scale-p (and (numberp zoom) (/= zoom 1.0)))

@@ -296,6 +296,7 @@
          (prim (pop thepoints))
          (sel? (selected? self))
          (color (if (zerop (ccolor self)) *om-black-color* (nth (-  (ccolor self) 1) *16-color-list*)))
+         ;; ZOOM-SCALE: pen / mark / offset scale with the box's zoom.
          (zoom (om-zoom-effective (thebox self)))
          (base-pen (if sel? 2 1))
          (pen      (max 1 (round (* base-pen zoom))))

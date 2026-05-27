@@ -22,7 +22,11 @@
 ;=========================================================================
 
 (in-package :om)
- 
+
+;;; Zoom categories in this file:
+;;;   - ZOOM-SCALE: draw methods scale pen and margins with view zoom
+;;;   - ZOOM-CTX:   *om-zoom-mini-helper-scale* propagates zoom into helper draw routines
+
 (defclass* bpc (bpf)
    ()
    (:icon 402)

@@ -284,8 +284,7 @@ Elements of methodPanels are instaces of the boxframe class.#enddoc#
 ;INITS
 ;--------------------------------------------------
 
-;; Panel-level IO buttons are suppressed; the generic-function zoom bar
-;; (see OM-ZOOM-EDITOR-BAR-BUILD methodEditor below) hosts them instead.
+;; ZOOM-UI: panel-level IO buttons suppressed; zoom bar hosts them instead.
 (defmethod add-window-buttons ((self methodPanel)) nil)
 
 #|
@@ -296,6 +295,7 @@ Elements of methodPanels are instaces of the boxframe class.#enddoc#
 (defmethod add-output-enabled ((self methodPanel) type) t)
 (defmethod add-input-enabled  ((self methodPanel) type) t)
 
+;; ZOOM-COORD: place new typed input within current logical viewport.
 ;; Generic-function methods take TYPED inputs; route ADD-INPUT through
 ;; MAKE-NEW-TYPED-INPUT so the generic zoom-bar IN button (and any other
 ;; caller) yields a typed-input by default.
@@ -421,6 +421,8 @@ Elements of methodPanels are instaces of the boxframe class.#enddoc#
 ;; built by OM-ZOOM-EDITOR-BAR-BUILD methodEditor (defined below).
 |#
 
+;;; ===== Zoom support: methodEditor editor bar =====
+;;; Categories: ZOOM-UI, ZOOM-INPUT
 (defmethod om-zoom-editor-bar-build ((editor methodEditor))
   "Generic-function zoom bar: same widgets as the default patch bar, but the
    IN button is a TYPED-INPUT-BUTTON whose DROP-ACTION creates a typed input
@@ -496,6 +498,7 @@ Elements of methodPanels are instaces of the boxframe class.#enddoc#
       (setf (capi:capi-object-property panel :om-zoom-numbox) numbox))
     (setf (capi:capi-object-property editor :om-zoom-editor-bar) bar)
     bar))
+;;; ===== End zoom support =====
 
 ; Editor to define a Generic Function for the first time
 (defun make-new-genfunwin (self name iconid doc &optional (package *package-user*))

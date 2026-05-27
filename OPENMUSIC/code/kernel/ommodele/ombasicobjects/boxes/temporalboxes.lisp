@@ -176,6 +176,7 @@ A TemporalBox is supposed to yield a musical result to integrate in a temporal c
      module))
 |#
 
+;; ZOOM-SCALE: zoom scopes io-side metric for temporal boxes.
 (defmethod make-frame-from-callobj ((self TemporalBox))
   (let* ((numouts (numouts self))
          (numins (length (inputs self)))
@@ -588,6 +589,7 @@ A TemporalBox is supposed to yield a musical result to integrate in a temporal c
                          (make-frame-from-callobj tempobj))
         |#
         (omG-add-element container
+                         ;; ZOOM-CTX: propagate container zoom to the new temporal box frame.
                          (let ((*make-frame-zoom-context*
                                 (and (typep container 'om-scroller) (om-zoom-of container))))
                            (make-frame-from-callobj tempobj)))

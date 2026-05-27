@@ -30,6 +30,9 @@
 
 (in-package :om)
 
+;;; Zoom categories in this file:
+;;;   - ZOOM-CTX: *make-frame-zoom-context* propagated when relation editor spawns frames
+
 ;----------------------------
 ;relationEditor
 ;----------------------------

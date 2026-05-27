@@ -529,6 +529,7 @@
   (:default-initargs
    #+win32 :draw-with-buffer #+win32 t))
 
+;; ZOOM-UI: soundPanel opts out of generic canvas zoom; ZOOM-CTX propagation on drop.
 (defmethod om-zoom-applies-p ((pane soundPanel)) nil)
 
 ;;; temp compatibility

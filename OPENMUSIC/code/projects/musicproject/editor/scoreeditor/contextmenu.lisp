@@ -25,6 +25,10 @@
 
 (in-package :om)
 
+;;; Zoom categories in this file:
+;;;   - ZOOM-COORD: visual click position unscaled to logical for new-box placement
+;;;   - ZOOM-CTX:   *make-frame-zoom-context* propagated when context menu spawns frames
+
 (defmethod om-get-menu-context ((object t)) nil)
 
 ;=============================

@@ -40,6 +40,7 @@
 
 (defclass OMLispPatch (OMPatch)
   ((list-exp :initform nil :initarg :lisp-exp :accessor lisp-exp)
+   ;; ZOOM-PERSIST: per-instance zoom serialized in the .oml body.
    (w-zoom :accessor w-zoom :initform 1.0))
   (:icon 124)
   (:documentation "The a patch written in Lisp")
@@ -105,6 +106,7 @@
 (defmethod load-abstraction-attributes ((self omlisppatch) currentpersistent)
   (call-next-method)
   (setf (lisp-exp self) (lisp-exp currentpersistent))
+  ;; ZOOM-PERSIST: forward zoom read from body into the live abstraction.
   (when (and (slot-exists-p currentpersistent 'w-zoom)
              (slot-boundp currentpersistent 'w-zoom))
     (setf (w-zoom self) (w-zoom currentpersistent)))
@@ -124,6 +126,7 @@
   (let ((newpatch (omNG-make-new-lisp-patch name)))
     (setf (omversion newpatch) version)
     (setf (lisp-exp newpatch) (get-lisp-str expression))
+    ;; ZOOM-PERSIST: apply zoom from saved body.
     (setf (w-zoom newpatch) zoom)
     newpatch))
 
@@ -140,6 +143,7 @@
   (let ((newpatch (make-instance 'OMLispPatchAbs :name name :icon 123)))
     (setf (omversion newpatch) version)
     (setf (lisp-exp newpatch) (get-lisp-str expression))
+    ;; ZOOM-PERSIST: apply zoom from saved body (OMLispPatchAbs).
     (setf (w-zoom newpatch) zoom)
     (compile-lisp-patch-fun newpatch)
     newpatch))
@@ -160,6 +164,7 @@
                        :name "lisp function output"
                        :indice 0)))
 
+;;; ===== Zoom support: live capture from lambda-exp editor =====
 (defun capture-lisp-window-zoom (patch)
   (let ((editor (editorframe patch))
         (cls (find-class 'patch-lambda-exp-window nil)))
@@ -167,6 +172,7 @@
       (let ((ep (om-lisp::ep editor)))
         (when (and ep (capi:capi-object-property ep :om-zoom-default-font))
           (setf (w-zoom patch) (oa::pane-current-zoom-ratio ep)))))))
+;;; ===== End zoom support =====
 
 #|
 (defmethod om-save ((self OMLispPatch) &optional (values? nil))
@@ -176,6 +182,7 @@
 
 (defmethod om-save ((self OMLispPatch) &optional (values? nil))
   (declare (ignore values?))
+  ;; ZOOM-PERSIST: capture live zoom then emit as trailing arg.
   (capture-lisp-window-zoom self)
   `(setf *om-current-persistent*
          (om-load-lisp-patch ,(name self) ,*om-version*
@@ -194,6 +201,7 @@
 (defmethod omNG-copy ((self OMLispPatch))
   `(let ((copy ,(call-next-method)))
      (setf (lisp-exp copy) (lisp-exp ,self))
+     ;; ZOOM-PERSIST: carry zoom into the copy.
      (setf (w-zoom copy) ,(w-zoom self))
      (compile-lisp-patch-fun copy)
      copy))
@@ -207,6 +215,7 @@
 
 (defmethod om-save ((self OMLispPatchAbs) &optional (values? nil))
   (declare (ignore values?))
+  ;; ZOOM-PERSIST: capture live zoom then emit as trailing arg (LispPatchAbs).
   (capture-lisp-window-zoom self)
   `(om-load-lisp-abspatch ,(name self) ,*om-version*
                           ,(str-without-nl (lisp-exp self))

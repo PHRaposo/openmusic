@@ -232,6 +232,7 @@ put this code in this method."
           (edit-existing-lambda-expression self)
         (let ((panel (panel (open-new-relationframe self (if (saved? self) (name self)
                                                           (string+ "^" (name self))) (get-elements self)))))
+          ;; ZOOM-PERSIST: restore saved zoom; flag guards changed? from the apply.
           (let ((z (get-win-zoom self)))
             (when (and panel z (typep panel 'om-scroller) (not (= z 1.0)))
               (let ((was-changed (changed-wsparams? self)))
@@ -464,6 +465,7 @@ put this code in this method."
 (defclass OMPatchAbs (OMPatch)
   ((w-size :accessor w-size :initform (om-make-point 400 500))
    (w-pos :accessor w-pos :initform (om-make-point 200 200))
+   ;; ZOOM-PERSIST: per-instance zoom (OMPatchAbs has no header file).
    (w-zoom :accessor w-zoom :initform 1.0))
    (:documentation "This is the class of the patch references of red patch boxes.
 The difference with normal patches is that this patches are not saved in a owner file.
@@ -496,6 +498,7 @@ So abstractions or red patches can not be sharing.#enddoc#
    "Not duplication or the mypathname slot"
    (let ((obj (call-next-method)))
      `(let ((copy ,obj))
+        ;; ZOOM-PERSIST: carry zoom into the copy.
         (setf (w-zoom copy) ,(w-zoom self))
         (compile-patch copy)
         copy)))
@@ -530,10 +533,12 @@ So abstractions or red patches can not be sharing.#enddoc#
 (defmethod set-win-position ((self OMPatchAbs) newpos)
   (setf (w-pos self) newpos))
 
+;;; ===== Zoom support: OMPatchAbs accessors =====
 (defmethod get-win-zoom ((self OMPatchAbs)) (w-zoom self))
 
 (defmethod set-win-zoom ((self OMPatchAbs) zoom)
   (setf (w-zoom self) zoom))
+;;; ===== End zoom support =====
 
 ;;; for send-receive
 #|
@@ -556,6 +561,7 @@ So abstractions or red patches can not be sharing.#enddoc#
                                                             (string+ "^" (name self))) (get-elements self)
                                                      nil
                                                      (w-pos self) (w-size self)))))
+           ;; ZOOM-PERSIST: restore saved zoom on editor open.
            (let ((z (w-zoom self)))
              (when (and panel z (typep panel 'om-scroller) (not (= z 1.0)))
                (setf (capi:capi-object-property panel :om-zoom-restoring-p) t)
@@ -612,9 +618,11 @@ So abstractions or red patches can not be sharing.#enddoc#
         (when (editorframe self)
           (set-win-size self (om-interior-size (window (editorframe self))))
           (set-win-position self (om-view-position (window (editorframe self))))
+          ;; ZOOM-PERSIST: capture live panel zoom before saving.
           (let ((p (panel (editorframe self))))
             (when (and p (typep p 'om-scroller))
               (set-win-zoom self (om-zoom-of p)))))
+        ;; ZOOM-PERSIST: emit zoom as trailing arg of om-load-patch-abs1.
         `(om-load-patch-abs1 ,(name self) ',boxes ',connectiones ,*om-version* ,pictlist ,doc
                              ,(om-save-point (w-pos self)) ,(om-save-point (w-size self))
                              ,(w-zoom self)))))
@@ -633,6 +641,7 @@ So abstractions or red patches can not be sharing.#enddoc#
      (setf (doc newpatch) (str-with-nl doc))
      (when wpos (setf (w-pos newpatch) wpos))
      (when wsize (setf (w-size newpatch) wsize))
+     ;; ZOOM-PERSIST: accept zoom from saved form (guarded against legacy nil).
      (when (and wzoom (numberp wzoom)) (setf (w-zoom newpatch) wzoom))
      (compile-patch newpatch)
      (when version

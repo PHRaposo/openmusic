@@ -154,6 +154,7 @@
 |#
 
 ;;; new : textenterview container = panel
+;; ZOOM-SCALE: zoom factor scopes tooltip + mag-in-out icon scaling.
 (defmethod om-view-mouse-enter-handler ((self input-funboxframe))
   (let ((zoom (om-zoom-effective self)))
     (when *mag-in-out* (setf (iconid self) 1550))
@@ -222,6 +223,7 @@
 ;;;new : text-view is on the panel
 (defmethod om-view-mouse-leave-handler ((self input-funboxframe))
   (when *mag-in-out*
+    ;; ZOOM-SCALE: restore input icon at zoomed metrics.
     (let* ((zoom  (om-zoom-effective self))
            (small (round (* 8 zoom)))
            (off2  (round (* 2 zoom)))
@@ -268,6 +270,7 @@
       (popup-keyword-val-menu (object self) panel))
       
      ((and (om-shift-key-p) (not (maquette-p (object container))))
+      ;; ZOOM-COORD: unscale visual click point so the new OMBox stores logical coords.
       (let* ((zoom    (if (typep panel 'om-scroller) (om-zoom-of panel) 1.0))
              (vis-pos (om-make-point (+ (x (om-view-container self)) (x self))
                                      (- (y (om-view-container self)) 30)))
@@ -280,6 +283,7 @@
         (setf (value new-obj) (get-input-value (object self)))
         (setf (thestring new-obj) (format () "~S" (value new-obj)))
         (setf (frame-size new-obj) (om-make-point (get-name-size (thestring new-obj)) 28))
+        ;; ZOOM-CTX: propagate target zoom so the new frame inherits scale.
         (setf new-frame (let ((*make-frame-zoom-context*
                                (and (typep target 'om-scroller) (om-zoom-of target))))
                           (make-frame-from-callobj new-obj)))
@@ -299,6 +303,7 @@
           (when (text-view container)
             (om-remove-subviews panel (text-view container))
             (setf (text-view container) nil))
+          ;; ZOOM-SCALE: font + offset + height scale with panel zoom.
           (let* ((thetext (format () "~S" (value (object self))))
                  (zoom    (if (typep panel 'om-scroller) (om-zoom-of panel) 1.0))
                  (font    (if (= zoom 1.0) *om-default-font1* (om-zoom-scale-font *om-default-font1* zoom)))

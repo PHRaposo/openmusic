@@ -70,6 +70,7 @@
                         y0 (round (+ y yp)))))))))
 |#
 
+;; ZOOM-SCALE: pen width scales with view zoom.
 (defmethod draw-obj-in-rect ((self  board) x x1 y y1 edparams  view)
   (let* ((zoom (om-zoom-effective view))
          (pen  (max 1 (round zoom)))

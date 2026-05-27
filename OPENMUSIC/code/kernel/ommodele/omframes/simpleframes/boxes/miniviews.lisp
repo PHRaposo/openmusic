@@ -130,6 +130,7 @@
         (om-draw-string 4 (- (h self) 5) (name box)))
 |#
 
+;; ZOOM-SCALE: ancestor zoom scopes icon size, font, and label offsets.
 (defmethod om-draw-contents ((self miniview))
   (let* ((box  (object (om-view-container self)))
          (zoom (om-zoom-find-ancestor-zoom self)))
@@ -249,6 +250,7 @@
 |#
 
 #-linux
+;; ZOOM-SCALE: pen, font and margins scale with view zoom.
 (defmethod draw-obj-in-rect ((self t) x x1 y y1 edparams view)
   (declare (ignore edparams))
   (let* ((zoom        (om-zoom-effective view))
@@ -303,6 +305,7 @@
 |#
 
 #+linux
+;; ZOOM-SCALE: pen, font and margins scale with view zoom (Linux variant).
 (defmethod draw-obj-in-rect ((self t) x x1 y y1 edparams view)
   (declare (ignore edparams))
   (let* ((zoom        (om-zoom-effective view))

@@ -144,6 +144,7 @@ Lock the box ('b') to keep the current file.
         ))
 |#
 
+;; ZOOM-SCALE: font and label margins scale with view zoom.
 (defmethod draw-obj-in-rect ((self sdiffile) x x1 y y1 params view)
   (let* ((zoom        (om-zoom-effective view))
          (scale-p     (and (numberp zoom) (/= zoom 1.0)))

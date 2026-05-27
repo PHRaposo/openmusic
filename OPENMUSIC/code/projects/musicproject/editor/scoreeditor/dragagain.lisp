@@ -25,6 +25,9 @@
 
 (in-package :om)
 
+;;; Zoom categories in this file:
+;;;   - ZOOM-CTX: *make-frame-zoom-context* propagated on score-editor drop
+
 (defmethod drop-allow-p ((D&DHandler omdrag-drop) (dragged OMPatch) (target score-element)) t)
 
 (defmethod perform-drop ((D&DHandler omdrag-drop) (dragged patch-icon-frame) 

@@ -951,6 +951,9 @@
  (setf (choice-selection self) index))
 
 
+;;; ===== Zoom support: dialog widgets =====
+;;; Category: ZOOM-UI
+
 ;;;==========================
 ;;; OM-ZOOM-POP-UP
 ;;;==========================
@@ -1081,6 +1084,8 @@ preset). Click opens a CAPI menu of preset percentages."))
 
 (defmethod om-set-zoom-musical-font-pop-up-presets ((self om-zoom-musical-font-pop-up) preset-list)
   (setf (zoom-presets self) preset-list))
+
+;;; ===== End zoom support =====
  
 
 

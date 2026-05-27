@@ -372,6 +372,7 @@
                  (doc (str-with-nl (nth 5 wsparams))))
             (setf newicon (nth 6 wsparams))
             (setf (wsparams newobj) (loop for item in wspar collect (eval item)))
+            ;; ZOOM-PERSIST: restore zoom from wsparams tail field on import.
             (let ((zoom (nth 10 wsparams)))
               (when (and zoom (numberp zoom) (/= zoom 1.0))
                 (set-win-zoom newobj zoom)))
@@ -505,6 +506,7 @@
     (let ((newbox (import-dragged-object self (pathname (car files)) (om-mouse-position self))))
       (if newbox
         (progn (omG-add-element self
+                                ;; ZOOM-CTX: bind target zoom so new frame inherits scroller zoom.
                                 (let ((*make-frame-zoom-context*
                                        (and (typep self 'om-scroller) (om-zoom-of self))))
                                   (make-frame-from-callobj newbox))) t)

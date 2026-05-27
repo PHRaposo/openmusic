@@ -177,6 +177,7 @@
    (trackpanels :accessor trackpanels :initarg :trackpanels :initform nil))
   (:default-initargs :draw-with-buffer t))
 
+;; ZOOM-UI: sheet-scorepanel opts out of generic canvas zoom.
 (defmethod om-zoom-applies-p ((pane sheet-scorepanel)) nil)
 
 (defclass sheet-titlebar (editor-titlebar) 

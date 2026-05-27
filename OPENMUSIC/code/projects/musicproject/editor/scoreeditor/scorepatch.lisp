@@ -73,6 +73,7 @@
      ))
 |#
 
+;; ZOOM-SCALE: zoom scopes module pos/size for score-box frames.
 (defmethod make-frame-from-callobj ((self score-box))
    (let* ((zoom    (or *make-frame-zoom-context* 1.0))
           (scale-p (and (numberp zoom) (/= zoom 1.0)))

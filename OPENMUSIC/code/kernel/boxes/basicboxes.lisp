@@ -770,6 +770,7 @@ In order to remove the previous TemporalBoxes, consider using the functions Remo
          (omng-add-element maquette newbox)
        (let ((ef (editorframe maquette)))
          (omg-add-element ef
+                          ;; ZOOM-CTX: propagate editor zoom into new maquette box frame.
                           (let ((*make-frame-zoom-context*
                                  (and (typep ef 'om-scroller) (om-zoom-of ef))))
                             (make-frame-from-callobj newbox)))))

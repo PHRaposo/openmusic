@@ -53,6 +53,7 @@
 (defmethod OpenEditorframe ((self patchForLoop))
    (or (editorframe self)
        (let ((panel (panel (open-new-RelationFrame self (string+ "OM Loop - "(name self)) (get-elements self)))))
+         ;; ZOOM-PERSIST: restore w-zoom inherited via OMPatchAbs slot.
          (let ((z (w-zoom self)))
            (when (and panel z (typep panel 'om-scroller) (not (= z 1.0)))
              (setf (capi:capi-object-property panel :om-zoom-restoring-p) t)
@@ -482,6 +483,8 @@
                                                                (mk-unique-name self "accum"))))))))
 |#
 
+;;; ===== Zoom support: loop toolbar installed into editor zoom bar =====
+;;; Categories: ZOOM-UI, ZOOM-CTX
 (defmethod add-window-buttons ((self loopPanel))
   "Add the loop toolbar (iterators + accumulators) into the editor's zoom bar."
   (call-next-method)
@@ -521,6 +524,7 @@
                 (om-set-view-position b (om-make-point x y))
                 (incf x 25)
                 (om-add-subviews host b)))))))))
+;;; ===== End zoom support =====
 
 #|
 ;; Legacy panel layout matching openmusic-8.0:

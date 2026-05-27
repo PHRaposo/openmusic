@@ -436,12 +436,15 @@
            (draw-mini-obj value self fs (mv-view-size value self))))))))
 
 
+;;; ===== Zoom support: tempobjframe relayout =====
+;;; Category: ZOOM-UI
 (defmethod om-zoom-relayout-frame ((self tempobjframe))
   ;; Drop cached miniview after inherited layout so it rebuilds at new zoom.
   (call-next-method)
   (when (minipict self)
     (om-kill-picture (minipict self))
     (setf (minipict self) nil)))
+;;; ===== End zoom support =====
 
 
 (defmethod om-draw-contents ((self outtempobj))

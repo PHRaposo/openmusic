@@ -942,6 +942,7 @@ Press 'space' to play/stop the sound file.
       )))
 |#
 
+;; ZOOM-SCALE: font and label positions scale with view zoom.
 (defmethod draw-obj-in-rect ((self sound) x x1 y y1 edparams view)
   (let* ((picture (if (and (pict-spectre self) (get-param edparams :show-spectrum))
                       (thepict (pict-spectre self))

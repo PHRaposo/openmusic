@@ -531,16 +531,16 @@
 (export '(om-tab-layout om-make-tab-layout om-current-view) :om-api)
 
 
-;;;======================
-;;; ZOOM
-;;;======================
+;;; ===== Zoom support: core engine =====
+;;; Categories present in this file: ZOOM-CTX, ZOOM-SCALE, ZOOM-INPUT, ZOOM-COORD
+
+;;; --- ZOOM-CTX: constants and dynamic variables ---
 
 (defparameter +om-zoom-min+ 0.5)
 (defparameter +om-zoom-max+ 4.0)
 
 (defvar *om-zoom-default* 1.0)
 (defvar *om-zoom-gesture-sensitivity* 1.0)
-(defvar *om-zoom-trackpad-boost* 1.0)
 
 (defvar *om-zoom-in-progress-p* nil)
 (defvar *om-zoom-unscale-mouse-pos-p* nil)
@@ -564,6 +564,8 @@
              (concatenate 'string "~&[om-zoom-diag] " fmt "~%")
              args)
       (finish-output s))))
+
+;;; --- ZOOM-SCALE: pure helpers (clamp, scale, log) ---
 
 (defun om-clamp-zoom (z)
   "Clamp Z to [+om-zoom-min+, +om-zoom-max+]."
@@ -590,6 +592,8 @@
         (gp:augment-font-description desc :size (max 1 (round (* size zoom)))))
     (error (c) (om-zoom-log-error :scale-font c) font)))
 
+;;; --- ZOOM-CTX: storage (om-zoom-of via capi-object-property) ---
+
 (defgeneric om-zoom-of (pane)
   (:documentation "Current zoom factor of PANE."))
 
@@ -604,6 +608,8 @@
 (defun om-zoom-transformed-p (pane)
   "T iff PANE has a non-identity zoom transform."
   (/= (om-zoom-of pane) 1.0))
+
+;;; --- ZOOM-CTX: effective zoom and ancestor walk ---
 
 (defun om-zoom-find-ancestor-zoom (frame)
   "Zoom factor of FRAME's nearest om-scroller ancestor, or session default."
@@ -622,6 +628,8 @@
          (pane (om-zoom-find-ancestor-zoom pane))
          (t *om-zoom-default*))))))
 
+;;; --- ZOOM-CTX: logical-state snapshots ---
+
 (defun om-zoom-capture-logical-geom (frame)
   "Snapshot FRAME's current pos and size as the LOGICAL reference; idempotent."
   (unless (om-zoom-logical-pos frame)
@@ -636,6 +644,8 @@
       (when current
         (setf (om-zoom-logical-font frame) current)))))
 
+;;; --- ZOOM-CTX: opt-out predicate ---
+
 (defgeneric om-zoom-applies-p (pane)
   (:documentation "T iff zoom gestures apply to PANE."))
 
@@ -647,6 +657,8 @@
                   *om-default-font1b* *om-default-font2b*
                   *om-default-font3b* *om-default-font4b*
                   *ombox-font* *icon-size-factor* *miniview-font-size*))
+
+;;; --- ZOOM-SCALE: font wrappers (zoom-aware) ---
 
 (defun om-current-default-font0 (frame)
   (let ((zoom (om-zoom-effective frame)))
@@ -720,6 +732,8 @@
         *miniview-font-size*
         (max 1 (round (* *miniview-font-size* zoom))))))
 
+;;; --- ZOOM-COORD: anchor coordinates per platform ---
+
 #+win32
 (defun om-zoom-touch-anchor (pane x y)
   (declare (ignore pane))
@@ -729,6 +743,8 @@
 (defun om-zoom-touch-anchor (pane x y)
   (values (- x (tracked-scroll-x pane))
           (- y (tracked-scroll-y pane))))
+
+;;; --- frame-protocol defgenerics ---
 
 (defgeneric om-zoom-relayout-frame (frame)
   (:documentation "Re-apply layout to FRAME after PANE's zoom changed."))
@@ -756,6 +772,8 @@
   (:documentation "Refresh FRAME's connection points after a zoom relayout."))
 
 (defmethod om-zoom-redraw-connections ((frame t)) nil)
+
+;;; --- entry point: om-zoom-update ---
 
 (defun om-zoom-update (pane new-zoom &optional anchor-x anchor-y)
   "Set PANE's zoom to NEW-ZOOM (clamped) anchored at (ANCHOR-X, ANCHOR-Y).
@@ -808,10 +826,11 @@ Returns the clamped factor, or NIL when no change."
 (defun om-reset-zoom (pane)        (om-zoom-update pane 1.0))
 (defun om-get-zoom   (pane)        (om-zoom-of pane))
 
+;;; --- ZOOM-INPUT: gesture handlers ---
+
 (defun om-zoom-touch-handler (pane x y scale)
   (let* ((sensitivity (or *om-zoom-gesture-sensitivity* 1.0))
-         (boost       *om-zoom-trackpad-boost*)
-         (eff-scale   (+ 1.0 (* (- scale 1.0) sensitivity boost))))
+         (eff-scale   (+ 1.0 (* (- scale 1.0) sensitivity))))
     (when (and (typep pane 'om-scroller) (om-zoom-applies-p pane))
       (multiple-value-bind (vx vy) (om-zoom-touch-anchor pane x y)
         (om-zoom-touch-update pane eff-scale vx vy)))))
@@ -865,9 +884,10 @@ Returns the clamped factor, or NIL when no change."
         (:up    (om-zoom-scroll-pane pane :om-key-up))
         (:down  (om-zoom-scroll-pane pane :om-key-down))))))
 
+;;; --- exports ---
+
 (export '(+om-zoom-min+ +om-zoom-max+
           *om-zoom-default* *om-zoom-gesture-sensitivity*
-          *om-zoom-trackpad-boost*
           *om-zoom-in-progress-p* *om-zoom-unscale-mouse-pos-p*
           *om-zoom-diag-events-p* *om-zoom-diag-apply-p*
           *om-zoom-mini-helper-scale*
@@ -897,6 +917,8 @@ Returns the clamped factor, or NIL when no change."
           tracked-scroll-x tracked-scroll-y
           om-move-scroll-position)
         :om-api)
+
+;;; ===== End zoom support =====
 
 
 

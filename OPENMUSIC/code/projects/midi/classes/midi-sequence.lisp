@@ -146,6 +146,7 @@ The structure is similar to that of a CHORD-SEQ: each parameters are specified b
            ))))
 |#
 
+;; ZOOM-SCALE: font and text positions scale with view zoom.
 (defmethod draw-obj-in-rect ((self EventMidi-seq) x x1 y y1 edparams view)
   (let* ((zoom        (om-zoom-effective view))
          (scale-p     (and (numberp zoom) (/= zoom 1.0)))

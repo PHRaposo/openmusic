@@ -54,6 +54,7 @@
          (version (omversion self))
          (ws (ensure-ws-params self))
          (wspar (om-save-point-list (subseq ws 0 (min 3 (length ws)))))
+         ;; ZOOM-PERSIST: tail field of the header param list (position 11).
          (zoom (get-win-zoom self))
          (params (list version ftype (first wspar) (second wspar) (third wspar) (str-without-nl (doc self)) (save-icon icon) 0
                        (car (create-info self)) (cadr (create-info self))

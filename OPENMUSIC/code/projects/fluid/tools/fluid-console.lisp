@@ -295,9 +295,12 @@ In this case, all internal events are sent simultaneously.
   ;;;(:default-initargs :scrollbars :h :retain-scrollbars t)
    )
 
+;;; ===== Zoom support: fluidcontrollerPanel touch opt-out =====
+;;; Category: ZOOM-INPUT
 (defmethod om-zoom-touch-update ((pane fluidcontrollerPanel) scale anchor-x anchor-y)
   (declare (ignore scale anchor-x anchor-y))
   nil)
+;;; ===== End zoom support =====
 
 (defmethod editor ((self fluidcontrollerPanel))
   (om-view-container self))

@@ -178,6 +178,7 @@
          (om-draw-rect (+ 1 x0) (+ 1 y0) (- (om-point-h pictsize) 2) (- (om-point-v pictsize) 2))))))
 |#
 
+;; ZOOM-COORD: scale logical pict-pos / pict-size to visual for drawing.
 (defmethod draw-pict-patch ((self patch-picture) view)
   (let* ((zoom     (om-zoom-of view))
          (vis-pos  (if (= zoom 1.0) (pict-pos  self) (om-zoom-scale-point (pict-pos  self) zoom)))

@@ -29,7 +29,10 @@
 
 (in-package :om)
 
-(defclass Mult-scrollerEditor (nonrelationEditor) 
+;;; Zoom categories in this file:
+;;;   - ZOOM-UI: PackagePanel / PackageContentsPanel opt out of generic canvas zoom
+
+(defclass Mult-scrollerEditor (nonrelationEditor)
    ((current-scroll :initform 0 :accessor current-scroll)
     (scroll-list :initform nil  :accessor scroll-list))
    (:documentation "This is the class of windows containing one or more scrollers.#enddoc#

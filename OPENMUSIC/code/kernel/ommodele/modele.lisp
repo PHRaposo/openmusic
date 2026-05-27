@@ -353,6 +353,9 @@ Documentation for other metaobjects like omClasses are handled by MCL. #doc#
   (setf (changed-wsparams? self) t)
   (setf (nth 2 (wsparams self)) newsize))
 
+;;; ===== Zoom support: persistence accessors =====
+;;; Category: ZOOM-PERSIST
+
 (defgeneric get-win-zoom (self))
 (defgeneric set-win-zoom (self zoom))
 

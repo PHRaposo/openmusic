@@ -523,6 +523,7 @@ for all boxes in the patch after an evaluation.#ev-once-p#")
            (real-make-delete-before container (frames self))
            (omg-remove-element container (car (frames self)))
            (omG-add-element container
+                            ;; ZOOM-CTX: propagate container zoom to dead-reference replacement.
                             (let ((*make-frame-zoom-context*
                                    (and (typep container 'om-scroller) (om-zoom-of container))))
                               (make-frame-from-callobj newobj)))))
@@ -656,6 +657,7 @@ for all boxes in the patch after an evaluation.#ev-once-p#")
 ;;; (w module) / (h module) are already VISUAL.
 (defmethod make-outputs-from-names ((self t) value module)
    "The outputs of these boxes depent from the initarg slots of the class reference."
+   ;; ZOOM-SCALE: output frame metrics honor the make-frame zoom context.
    (let* ((numouts (numouts self))
           (nameouts (get-outs-name value))
           (zoom    (or *make-frame-zoom-context* 1.0))
@@ -958,6 +960,7 @@ for all boxes in the patch after an evaluation.#ev-once-p#")
      module))
 |#
 
+;; ZOOM-SCALE: zoom scopes module sizing and miniview font scaling.
 (defmethod make-frame-from-callobj ((self OMBoxEditCall))
    "Make a simple frame for the editor factory 'self'."
    (let* ((name (string-downcase (name self)))
@@ -1342,6 +1345,7 @@ for all boxes in the patch after an evaluation.#ev-once-p#")
                                                 (mk-unique-name (panel patch) (string function))))
            (target (panel patch))
            new-frame)
+      ;; ZOOM-CTX: propagate target zoom into the Apropos-created lispboxcall frame.
       (setf new-frame (let ((*make-frame-zoom-context*
                              (and (typep target 'om-scroller) (om-zoom-of target))))
                         (make-frame-from-callobj new-call)))
@@ -1555,6 +1559,7 @@ for all boxes in the patch after an evaluation.#ev-once-p#")
     module))
 |#
 
+;; ZOOM-SCALE: zoom scopes module sizing and ttybox font scaling.
 (defmethod make-frame-from-callobj ((self OMBoxTypeCall))
   "Cons simple frames for 'self'."
   (let* ((name (string-downcase (name self)))
@@ -1693,6 +1698,7 @@ for all boxes in the patch after an evaluation.#ev-once-p#")
     module))
 |#
 
+;; ZOOM-SCALE: zoom scopes placeholder sizing for undefined references.
 (defmethod make-frame-from-callobj ((self OMBoxundefined))
   (let* ((zoom (or *make-frame-zoom-context* 1.0))
          (scale-p (and (numberp zoom) (/= zoom 1.0)))
@@ -1902,6 +1908,7 @@ for all boxes in the patch after an evaluation.#ev-once-p#")
     module))
 |#
 
+;; ZOOM-SCALE: zoom scopes comment box sizing and text font scaling.
 (defmethod make-frame-from-callobj ((self OMBoxcomment))
    "Cons a simple frame for the comment box 'self'."
   (let* ((zoom (or *make-frame-zoom-context* 1.0))

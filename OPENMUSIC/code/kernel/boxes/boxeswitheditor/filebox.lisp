@@ -202,6 +202,7 @@
                                   :action
                                   #'(lambda(item)  (declare (ignore item))
                                       (omG-add-element self
+                                                       ;; ZOOM-CTX: propagate panel zoom to new StreamFile frame.
                                                        (let ((*make-frame-zoom-context*
                                                               (and (typep self 'om-scroller) (om-zoom-of self))))
                                                          (make-frame-from-callobj

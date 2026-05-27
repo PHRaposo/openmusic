@@ -398,6 +398,7 @@ Note values are lists of (pitch date dur vel chan).
      ))
 |#
 
+;; ZOOM-SCALE: font and margins scale with miniview ancestor zoom.
 (defmethod draw-mini-view ((self miniview) (value MidiFile))
   (let* ((zoom        (om-zoom-effective self))
          (scale-p     (and (numberp zoom) (/= zoom 1.0)))

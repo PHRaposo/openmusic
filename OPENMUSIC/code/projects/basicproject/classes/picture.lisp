@@ -265,6 +265,7 @@ Exports as a raw bitmap (TIF format)
      (setf (frame-size newcall) (om-add-points (pict-size self) (om-make-point 0 16)))
      (setf (showpict newcall) t)
      (omG-add-element patch
+                      ;; ZOOM-CTX: propagate patch zoom to new picture-box frame.
                       (let ((*make-frame-zoom-context*
                              (and (typep patch 'om-scroller) (om-zoom-of patch))))
                         (make-frame-from-callobj newcall)))

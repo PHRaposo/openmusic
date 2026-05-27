@@ -29,6 +29,10 @@
 
 (in-package :om)
 
+;;; Zoom categories in this file:
+;;;   - ZOOM-UI: icon-browser panels (workspace/folder/class/genfun) opt out
+;;;              of generic canvas zoom (om-zoom-applies-p -> nil, om-zoom-of -> 1.0)
+
 ;--------------------------
 ;EDITOR
 ;----------------------

@@ -29,6 +29,10 @@
 
 (in-package :om)
 
+;;; Zoom categories in this file:
+;;;   - ZOOM-COORD: dragged position unscaled to logical for storage
+;;;   - ZOOM-CTX:   *om-zoom-drag-visual-pos* pins CAPI to dragged pixel
+
 (defvar *OM-drag&drop-handler* "An object that handles the drag and drop of views at the lisp level.")
 
 (defclass omdrag-drop ()

@@ -249,6 +249,7 @@ MIDIControl can be 'played' as a musical object (for instance in a maquette) on 
     ))))
 |#
 
+;; ZOOM-SCALE: font and margins scale with view zoom.
 (defmethod draw-obj-in-rect ((self MidiControl) x x1 y y1 edparams view)
   (let* ((zoom        (om-zoom-effective view))
          (scaled-font (if (= zoom 1.0) *om-default-font1* (om-zoom-scale-font *om-default-font1* zoom)))
