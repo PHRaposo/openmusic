@@ -618,6 +618,9 @@
         when (typep f 'om-scroller) return (om-zoom-of f)
         finally (return *om-zoom-default*)))
 
+(defvar *make-frame-zoom-context* nil)
+(export '*make-frame-zoom-context* :om-api)
+
 (defun om-zoom-effective (self)
   "Zoom factor that applies to SELF."
   (cond
@@ -626,6 +629,7 @@
         (cond
          ((typep pane 'om-scroller) (om-zoom-of pane))
          (pane (om-zoom-find-ancestor-zoom pane))
+         ((numberp *make-frame-zoom-context*) *make-frame-zoom-context*)
          (t *om-zoom-default*))))))
 
 ;;; --- ZOOM-CTX: logical-state snapshots ---
@@ -839,7 +843,6 @@ Returns the clamped factor, or NIL when no change."
 (defun om-zoom-touch-pan-handler (pane x y dx dy)
   (declare (ignore x y))
   (when (and (typep pane 'om-scroller)
-             (om-zoom-applies-p pane)
              (or (not (zerop dx)) (not (zerop dy))))
     (let* ((pos   (om-scroll-position pane))
            (hpos  (om-point-h pos))
@@ -861,13 +864,13 @@ Returns the clamped factor, or NIL when no change."
 
 (defun om-zoom-shift-wheel-handler (pane x y angle)
   (declare (ignore x y))
-  (when (and (typep pane 'om-scroller) (om-zoom-applies-p pane))
+  (when (typep pane 'om-scroller)
     (cond ((plusp  angle) (om-zoom-scroll-pane pane :om-key-right))
           ((minusp angle) (om-zoom-scroll-pane pane :om-key-left)))))
 
 (defun om-zoom-touch-swipe-handler (pane x y direction)
   (declare (ignore x y))
-  (when (and (typep pane 'om-scroller) (om-zoom-applies-p pane))
+  (when (typep pane 'om-scroller)
     (case direction
       (:left  (om-zoom-scroll-pane pane :om-key-left))
       (:right (om-zoom-scroll-pane pane :om-key-right))
@@ -876,7 +879,7 @@ Returns the clamped factor, or NIL when no change."
 
 (defun om-zoom-ctrl-arrow-handler (pane x y gspec)
   (declare (ignore x y))
-  (when (and (typep pane 'om-scroller) (om-zoom-applies-p pane))
+  (when (typep pane 'om-scroller)
     (let ((data (sys:gesture-spec-data gspec)))
       (case data
         (:left  (om-zoom-scroll-pane pane :om-key-left))

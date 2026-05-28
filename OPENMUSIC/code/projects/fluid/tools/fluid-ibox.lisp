@@ -166,6 +166,7 @@
      module))
 |#
 
+#|
 (defmethod make-frame-from-callobj ((self FLDIntbox))
    "Make a simple frame for the editor factory 'self'."
    (let* ((name (string-downcase (name self)))
@@ -229,11 +230,73 @@
      (let ((logical-size (frame-size self)))
        (when scale-p
          (setf (om-zoom-logical-size module) logical-size))
-       (om-set-view-size module
-                         (if scale-p
-                             (om-zoom-scale-point logical-size zoom)
-                           logical-size)))
+       (om-set-view-size module logical-size))
      (update-di-size (value self) module)
+
+     (when (allow-lock self)
+       (add-lock-button module (allow-lock self)))
+
+     module))
+|#
+
+(defmethod make-frame-from-callobj ((self FLDIntbox))
+   "Make a simple frame for the editor factory 'self'."
+   (let ((name (string-downcase (name self)))
+         (defsize (get-boxsize self))
+         (numouts (numouts self))
+         (numins (length (inputs self)))
+         (index 0)
+         (module (om-make-view (get-frame-class self)
+                               :name (name (value self))
+                               :position (frame-position self)
+                               :object self))
+         title)
+
+     (unless (frame-size self)
+       (setf (frame-size self) (om-make-point
+                                (apply #'max (list (om-point-h defsize) (* 8 numouts) (* 8 numins)))
+                                (om-point-v defsize))))
+
+     (setf (inputframes module) (mapcar #'(lambda (input)
+                                            (setf index (+ index 1))
+                                            (om-make-view (get-input-class-frame self)
+                                                            :object input
+                                                            :help-spec (string+ "<" (string-downcase (name input))
+                                                                                "> " (doc-string input))
+                                                            :size (om-make-point 8 8)
+                                                            :position (om-make-point
+                                                                       (- (* index (round (om-point-h (frame-size self)) (+ numins 1))) 4)
+                                                                       1)
+                                                            ))
+                                        (inputs self)))
+     (setf title (om-make-dialog-item 'om-static-text (om-make-point 5 8) (om-make-point 90 24) (name module)
+                                      :font *controls-font*))
+
+     (loop for input-f in (inputframes module) do (om-add-subviews module input-f))
+
+     (make-outputs-from-names self (value self) module)
+
+     (setf (iconview module) (value self))
+     (om-add-subviews module (iconview module) title)
+
+     (setf (frames self) (list module))
+     (setf (name module) name)
+     (add-box-resize module)
+
+     (om-set-view-size module (frame-size self))
+     (when (frame-position self)
+       (om-set-view-position module (frame-position self)))
+     (update-di-size (value self) module)
+
+     (setf (om-zoom-logical-size module) (frame-size self))
+     (when (frame-position self)
+       (setf (om-zoom-logical-pos module) (frame-position self)))
+
+     (when (and (value self)
+                (typep (value self) 'oa::om-standard-dialog-item)
+                (not (om-zoom-logical-font (value self))))
+       (setf (om-zoom-logical-font (value self))
+             (or (om-get-font (value self)) *controls-font*)))
 
      (when (allow-lock self)
        (add-lock-button module (allow-lock self)))

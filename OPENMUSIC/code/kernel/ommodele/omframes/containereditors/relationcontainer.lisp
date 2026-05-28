@@ -45,23 +45,21 @@ maquettes and hierarchical class editors.#enddoc#
 
 
 ;-------------Initialization
+#|
 (defun open-new-RelationFrame (object name elements &optional ref pos size)
    (let* ((position (or pos (get-win-position object)))
           (siz (or size (get-win-size object)))
           (newwindow nil))
-     (setf newwindow 
+     (setf newwindow
            (make-editor-window (get-editor-class object)
-                               object name ref 
+                               object name ref
                                :winpos position
                                :winsize siz
                                :winshow nil))
      (om-with-delayed-redraw (panel newwindow)
        (om-with-delayed-update (panel newwindow)
          (mapc #'(lambda (elem)
-                   (let ((newframe (let ((*make-frame-zoom-context*
-                                          (and (typep (panel newwindow) 'om-scroller)
-                                               (om-zoom-of (panel newwindow)))))
-                                     (make-frame-from-callobj elem))))
+                   (let ((newframe (make-frame-from-callobj elem)))
                      (om-add-subviews (panel newwindow) newframe)
                      (add-subview-extra newframe)
                      )) elements)
@@ -69,6 +67,54 @@ maquettes and hierarchical class editors.#enddoc#
                    (update-graphic-connections elem elements)) (get-subframes (panel newwindow)))
          (add-window-buttons (panel newwindow))
          ))
+     ;;; new jb
+     (set-field-size (panel newwindow))
+     ;(om-window-resized newwindow (om-view-size newwindow))
+     ;(om-invalidate-view (panel newwindow))
+     ;(om-select-window newwindow)
+     #+linux(capi:redisplay-element (panel newwindow))
+     newwindow))
+|#
+
+(defun open-new-RelationFrame (object name elements &optional ref pos size)
+   (let* ((position (or pos (get-win-position object)))
+          (siz (or size (get-win-size object)))
+          (newwindow nil))
+     (setf newwindow
+           (make-editor-window (get-editor-class object)
+                               object name ref
+                               :winpos position
+                               :winsize siz
+                               :winshow nil))
+     ;; Apply saved zoom to panel BEFORE creating frames, so make-frame-from-callobj
+     ;; sees it via *make-frame-zoom-context* / om-zoom-effective and builds frames
+     ;; already scaled. This avoids a tardy om-zoom-update on a non-realized panel,
+     ;; which racially crashed apply-in-pane-process on CAPI gadgets (cross-process).
+     (let* ((panel (panel newwindow))
+            (saved-zoom (and (typep panel 'om-scroller)
+                             (let ((z (get-win-zoom object)))
+                               (and (numberp z) (/= z 1.0) z)))))
+       (when saved-zoom
+         (setf (capi:capi-object-property panel :om-zoom-restoring-p) t)
+         (unwind-protect
+             (progn
+               (setf (om-zoom-of panel) saved-zoom)
+               (om-zoom-sync-display panel saved-zoom))
+           (setf (capi:capi-object-property panel :om-zoom-restoring-p) nil)))
+       (om-with-delayed-redraw panel
+         (om-with-delayed-update panel
+           (mapc #'(lambda (elem)
+                     (let ((newframe (let ((*make-frame-zoom-context*
+                                            (and (typep panel 'om-scroller)
+                                                 (om-zoom-of panel))))
+                                       (make-frame-from-callobj elem))))
+                       (om-add-subviews panel newframe)
+                       (add-subview-extra newframe)
+                       )) elements)
+           (mapc #'(lambda (elem)
+                     (update-graphic-connections elem elements)) (get-subframes panel))
+           (add-window-buttons panel)
+           )))
      ;;; new jb
      (set-field-size (panel newwindow))
      ;(om-window-resized newwindow (om-view-size newwindow))

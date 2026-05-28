@@ -217,7 +217,7 @@
 
 (defclass nonrelationPanel (metaobj-Panel)
    ((scroll-scrap :initform nil :allocation :class :accessor scroll-scrap))
-   (:documentation "Editorframes of meta objects where there are not connections beetwen their elements 
+   (:documentation "Editorframes of meta objects where there are not connections beetwen their elements
 are instances of this class. (i.e. Folders, WorkSpaces, Classes, Generic functions, etc.) .#enddoc#
 #seealso# (classpanel folderpannel instancepanel workspacepanel genericfunpanel) #seealso#
 #scroll-scrap# This slot store, if exists, an expression used for copy and paste propose.#scroll-scrap#"))

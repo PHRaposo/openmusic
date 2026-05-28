@@ -126,6 +126,7 @@
      module))
 |#
 
+#|
 (defmethod make-frame-from-callobj ((self OMDIebox))
    "Make a simple frame for the editor factory 'self'."
    (let* ((name (string-downcase (name self)))
@@ -178,12 +179,74 @@
      (setf (name module) name)
      (add-box-resize module)
 
-     (let ((logical-size (frame-size self)))
-       (om-set-view-size module
-                         (if scale-p
-                             (om-zoom-scale-point logical-size zoom)
-                           logical-size)))
+     (om-set-view-size module (frame-size self))
      (update-di-size (value self) module)
+
+     (when (allow-lock self)
+       (add-lock-button module (allow-lock self)))
+
+     module))
+|#
+
+(defmethod make-frame-from-callobj ((self OMDIebox))
+   "Make a simple frame for the editor factory 'self'."
+   (let ((name (string-downcase (name self)))
+         (defsize (get-boxsize self))
+         (numouts (numouts self))
+         (numins (length (inputs self)))
+         (index 0)
+         (module (om-make-view (get-frame-class self)
+                               :position (frame-position self)
+                               :object self)))
+
+     ;#-linux
+     (unless (frame-size self)
+              (setf (frame-size self) (om-make-point
+                                       (apply #'max (list (om-point-h defsize) (* 8 numouts) (* 8 numins)))
+                                       (om-point-v defsize))))
+     #|
+     #+linux(setf (frame-size self) (om-make-point
+                                       (apply #'max (list (om-point-h defsize) (* 8 numouts) (* 8 numins)))
+                                       (+ (om-point-v defsize) 10)))
+     |#
+     (setf (inputframes module) (mapcar #'(lambda (input)
+                                            (setf index (+ index 1))
+                                            (om-make-view (get-input-class-frame self)
+                                                            :object input
+                                                            :help-spec (string+ "<" (string-downcase (name input))
+                                                                                "> " (doc-string input))
+                                                            :size (om-make-point 8 8)
+                                                            :position (om-make-point
+                                                                       (- (* index (round (om-point-h (frame-size self)) (+ numins 1))) 4)
+                                                                       1)
+                                                            ))
+                                        (inputs self)))
+
+     (loop for input-f in (inputframes module) do (om-add-subviews module input-f))
+
+     (make-outputs-from-names self (value self) module)
+
+     (setf (iconview module) (value self))
+     (om-add-subviews module (iconview module))
+
+     (setf (frames self) (list module))
+     (setf (name module) name)
+     (add-box-resize module)
+
+     (om-set-view-size module (frame-size self))
+     (when (frame-position self)
+       (om-set-view-position module (frame-position self)))
+     (update-di-size (value self) module)
+
+     (setf (om-zoom-logical-size module) (frame-size self))
+     (when (frame-position self)
+       (setf (om-zoom-logical-pos module) (frame-position self)))
+
+     (when (and (value self)
+                (typep (value self) 'oa::om-standard-dialog-item)
+                (not (om-zoom-logical-font (value self))))
+       (setf (om-zoom-logical-font (value self))
+             (or (om-get-font (value self)) *controls-font*)))
 
      (when (allow-lock self)
        (add-lock-button module (allow-lock self)))
@@ -202,10 +265,26 @@
 (defmethod dieditorframe-p ((self t)) nil)
 (defmethod dieditorframe-p ((self DIEditorframe)) self)
 
-(defmethod om-show-tooltip ((self input-funboxframe) &optional (remove nil) (short nil)) 
+(defmethod om-show-tooltip ((self input-funboxframe) &optional (remove nil) (short nil))
   "prevenrting tooltips for interface boxes"
   (unless (dieditorframe-p (om-view-container self))
   (call-next-method)))
+
+;;; Outfleche hover may grow past the parent's vertical bound on DIEditorframe.
+;;; Reposition the outfleche so it stays within the dieditorframe slot.
+(defmethod om-view-mouse-enter-handler :after ((self outfleche))
+  (let ((parent (om-view-container self)))
+    (when (and parent
+               *mag-in-out*
+               (dieditorframe-p parent))
+      (let* ((parent-h (om-height parent))
+             (own-h    (om-point-y (om-view-size self)))
+             (cur-pos  (om-view-position self)))
+        (when (> (+ (om-point-y cur-pos) own-h) parent-h)
+          (om-set-view-position self
+                                (om-make-point (om-point-x cur-pos)
+                                               (- parent-h own-h)))
+          #+win32(capi:redraw-pinboard-object self))))))
 
 
 (defmethod show-fun-code ((self DIEditorframe))

@@ -81,10 +81,6 @@ in relation with the reference.#reference#
 (defgeneric make-frame-from-callobj (box)
    (:documentation "Cons the frame that visualize the object 'box'."))
 
-;; ZOOM-CTX: bound around make-frame-from-callobj to the destination panel's zoom.
-(defvar *make-frame-zoom-context* nil
-  "Bound around make-frame-from-callobj to the destination panel's zoom.")
-
 (defgeneric remove-extra (patch box)
    (:documentation "Called when you remove the box 'box' from the patch 'patch'."))
 

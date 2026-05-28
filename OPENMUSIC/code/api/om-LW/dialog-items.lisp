@@ -194,24 +194,36 @@
 
 (defmethod om-set-view-size ((self om-standard-dialog-item) size-point)
   (setf (vw self) (om-point-h size-point) (vh self) (om-point-v size-point))
-  (when (interface-visible-p self) 
-    (execute-with-interface-if-alive 
-     (top-level-interface self) 
-     (lambda () 
-                             
-       (set-hint-table self (list :default-width (om-point-h size-point) :defalut-height (om-point-v size-point)
-                                  :external-min-width (om-point-h size-point) :external-min-height (om-point-v size-point)
-                                  :external-max-width (om-point-h size-point) :external-max-height (om-point-v size-point)
-                                  ))
-
-       (setf (static-layout-child-size self) (values (om-point-h size-point) (om-point-v size-point)))
-       (setf (static-layout-child-position self) (values (vx self) (vy self)))
-       (di-after-settings self)
-       ))
-    ;(om-set-view-position self (om-make-point (vx self) (vy self)))
-    )
-  
-  )
+  ;;; Original `when interface-visible-p` skipped hint-table + static-layout updates
+  ;;; while panel was not yet realized (window-show happens after make-frame-from-callobj).
+  ;;; That left CAPI gadgets (button, check-box, slider...) with stale external-min/max-width
+  ;;; from `om-make-dialog-item` -- so a re-opened patch with zoom != 1.0 rendered them
+  ;;; at the saved visual size, not at the size for the current saved zoom.
+  ;;; Replaced with `apply-in-pane-process` which the LW manual states runs immediately
+  ;;; for not-yet-displayed panes, so hints persist for when CAPI realizes the panel.
+  ;(when (interface-visible-p self)
+  ;  (execute-with-interface-if-alive
+  ;   (top-level-interface self)
+  ;   (lambda ()
+  ;     (set-hint-table self (list :default-width (om-point-h size-point) :defalut-height (om-point-v size-point)
+  ;                                :external-min-width (om-point-h size-point) :external-min-height (om-point-v size-point)
+  ;                                :external-max-width (om-point-h size-point) :external-max-height (om-point-v size-point)
+  ;                                ))
+  ;     (setf (static-layout-child-size self) (values (om-point-h size-point) (om-point-v size-point)))
+  ;     (setf (static-layout-child-position self) (values (vx self) (vy self)))
+  ;     (di-after-settings self)
+  ;     ))
+  ;  ;(om-set-view-position self (om-make-point (vx self) (vy self)))
+  ;  )
+  (capi:apply-in-pane-process self
+                              (lambda ()
+                                (set-hint-table self (list :default-width (om-point-h size-point) :defalut-height (om-point-v size-point)
+                                                           :external-min-width (om-point-h size-point) :external-min-height (om-point-v size-point)
+                                                           :external-max-width (om-point-h size-point) :external-max-height (om-point-v size-point)
+                                                           ))
+                                (setf (static-layout-child-size self) (values (om-point-h size-point) (om-point-v size-point)))
+                                (setf (static-layout-child-position self) (values (vx self) (vy self)))
+                                (di-after-settings self))))
 
 (defmethod om-create-callback ((self om-standard-dialog-item))
   (set-hint-table self (list :default-x (vx self) :default-y (vy self) :default-width (vw self) :defalut-height (vh self))))
