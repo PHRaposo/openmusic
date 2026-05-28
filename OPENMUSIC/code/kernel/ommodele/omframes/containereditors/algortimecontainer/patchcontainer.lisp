@@ -330,7 +330,7 @@ because digit-char-p will not accept backspace and special om keys!"
 (defvar *cur-eval-panel* nil)
 
 (defmethod handle-key-event ((self patchPanel) char)
-  ;; ZOOM-INPUT: Ctrl+= / Ctrl+- step by 1.1, Ctrl+0 resets.
+  ;; ZOOM-INPUT: Ctrl+= / Ctrl+- step by 1.1, Ctrl+0 resets to 100% and recenters.
   (when (and (om-command-key-p) (om-zoom-applies-p self))
     (cond
      ((or (equal char #\=) (equal char #\+))
@@ -340,7 +340,7 @@ because digit-char-p will not accept backspace and special om keys!"
       (om-zoom-numbox-apply self (/ (om-zoom-of self) 1.1))
       (return-from handle-key-event t))
      ((equal char #\0)
-      (om-zoom-numbox-apply self 1.0)
+      (om-zoom-reset-and-recenter self)
       (return-from handle-key-event t))))
   (modify-patch self)
   (let* ((*om-zoom-unscale-mouse-pos-p* t)
@@ -1590,9 +1590,87 @@ Elements of the list are list as (source-position source-output target-position 
     (when widget
       (om-set-zoom-pop-up-value widget (round (* new-zoom 100))))))
 
-;; Anchored at TOP-LEFT (0,0) so zoom in/out stays pinned at the visible origin.
+(defun om-zoom-enclosing-bbox (frames)
+  "VISUAL bbox of FRAMES as (min-x min-y max-x max-y), or NIL when empty."
+  (when frames
+    (let (min-x min-y max-x max-y)
+      (dolist (f frames)
+        (let ((p (om-view-position f))
+              (s (om-view-size f)))
+          (when (and p s)
+            (let ((x0 (om-point-h p))
+                  (y0 (om-point-v p))
+                  (x1 (+ (om-point-h p) (om-point-h s)))
+                  (y1 (+ (om-point-v p) (om-point-v s))))
+              (setf min-x (if min-x (min min-x x0) x0))
+              (setf min-y (if min-y (min min-y y0) y0))
+              (setf max-x (if max-x (max max-x x1) x1))
+              (setf max-y (if max-y (max max-y y1) y1))))))
+      (when (and min-x min-y max-x max-y)
+        (list min-x min-y max-x max-y)))))
+
+(defun om-zoom-selected-frames (pane)
+  "Boxes and connections currently selected by the user."
+  (append (get-actives pane) (get-actives-connections pane)))
+
+(defun om-zoom-content-frames (pane)
+  "All boxframes that are direct subviews of PANE."
+  (let (rep)
+    (dolist (sub (om-subviews pane))
+      (when (boxframe-p sub)
+        (push sub rep)))
+    (nreverse rep)))
+
+;; Anchor in VIEWPORT coords (visual - scroll).
+(defun om-zoom-step-anchored (pane new-zoom)
+  "Anchor at the center of the current selection bbox if any,
+   otherwise at the center of all content. Empty panel falls back to viewport center."
+  (multiple-value-bind (vw vh) (capi:simple-pane-visible-size pane)
+    (let* ((vw (or vw 0))
+           (vh (or vh 0))
+           (sx (oa::tracked-scroll-x pane))
+           (sy (oa::tracked-scroll-y pane))
+           (frames (or (om-zoom-selected-frames pane)
+                       (om-zoom-content-frames pane)))
+           (bbox (om-zoom-enclosing-bbox frames))
+           (anchor-x 0)
+           (anchor-y 0))
+      (cond
+       (bbox
+        (setf anchor-x (round (- (/ (+ (first bbox) (third bbox)) 2) sx)))
+        (setf anchor-y (round (- (/ (+ (second bbox) (fourth bbox)) 2) sy))))
+       (t
+        (setf anchor-x (round vw 2))
+        (setf anchor-y (round vh 2))))
+      (om-zoom-update pane new-zoom anchor-x anchor-y))))
+
+(defun om-zoom-reset-and-recenter (pane)
+  "Reset zoom to 1.0 and scroll so the content bbox center lands at the viewport center
+   (clamped to non-negative scroll)."
+  (multiple-value-bind (vw vh) (capi:simple-pane-visible-size pane)
+    (let* ((vw (or vw 0))
+           (vh (or vh 0))
+           (current-zoom (om-zoom-of pane))
+           (all (om-zoom-content-frames pane))
+           (bbox (om-zoom-enclosing-bbox all)))
+      (cond
+       ((null bbox)
+        (setf (oa::tracked-scroll-x pane) 0)
+        (setf (oa::tracked-scroll-y pane) 0)
+        (om-zoom-update pane 1.0 0 0))
+       (t
+        (let* ((cx-vis (/ (+ (first bbox) (third bbox)) 2))
+               (cy-vis (/ (+ (second bbox) (fourth bbox)) 2))
+               (cx-log (if (zerop current-zoom) cx-vis (/ cx-vis current-zoom)))
+               (cy-log (if (zerop current-zoom) cy-vis (/ cy-vis current-zoom)))
+               (new-sx (max 0 (round (- cx-log (/ vw 2)))))
+               (new-sy (max 0 (round (- cy-log (/ vh 2))))))
+          (setf (oa::tracked-scroll-x pane) new-sx)
+          (setf (oa::tracked-scroll-y pane) new-sy)
+          (om-zoom-update pane 1.0 0 0)))))))
+
 (defun om-zoom-numbox-apply (pane new-zoom)
-  (om-zoom-update pane new-zoom 0 0))
+  (om-zoom-step-anchored pane new-zoom))
 
 ;; Maquette panels run their own native zoom; skip the editor zoom bar.
 (defun om-zoom-editor-applies-p (editor)
