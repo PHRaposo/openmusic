@@ -771,6 +771,20 @@
 (defmethod om-zoom-touch-update ((pane om-scroller) scale anchor-x anchor-y)
   (om-zoom-update pane (* (om-zoom-of pane) scale) anchor-x anchor-y))
 
+(defgeneric om-zoom-resolve-touch-target (pane x y)
+  (:documentation
+   "Resolve a (:touch :zoom) event delivered to PANE at viewport-local (X, Y)
+    into the om-scroller where the zoom should apply, with the anchor
+    translated to that scroller's frame. Returns (values scroller vx vy)
+    or NIL when PANE has no zoom-capable target."))
+
+(defmethod om-zoom-resolve-touch-target ((pane t) x y)
+  (declare (ignore pane x y))
+  nil)
+
+(defmethod om-zoom-resolve-touch-target ((pane om-scroller) x y)
+  (values pane x y))
+
 (defgeneric om-zoom-sync-display (pane factor)
   (:documentation "Refresh PANE's zoom-display chrome after FACTOR changed."))
 
@@ -850,9 +864,11 @@ Returns the clamped factor, or NIL when no change."
 (defun om-zoom-touch-handler (pane x y scale)
   (let* ((sensitivity (or *om-zoom-gesture-sensitivity* 1.0))
          (eff-scale   (+ 1.0 (* (- scale 1.0) sensitivity))))
-    (when (and (typep pane 'om-scroller) (om-zoom-applies-p pane))
-      (multiple-value-bind (vx vy) (om-zoom-touch-anchor pane x y)
-        (om-zoom-touch-update pane eff-scale vx vy)))))
+    (multiple-value-bind (scroller sx sy)
+        (om-zoom-resolve-touch-target pane x y)
+      (when (and scroller (om-zoom-applies-p scroller))
+        (multiple-value-bind (vx vy) (om-zoom-touch-anchor scroller sx sy)
+          (om-zoom-touch-update scroller eff-scale vx vy))))))
 
 #+win32
 (defun om-zoom-touch-pan-handler (pane x y dx dy)
@@ -877,9 +893,24 @@ Returns the clamped factor, or NIL when no change."
     (when (and sym (fboundp sym))
       (funcall sym pane direction))))
 
-(defun om-zoom-shift-wheel-handler (pane x y angle)
+#+win32
+(defvar *om-shift-wheel-hscroll-step* 50
+  "Pixels per Shift+MouseWheel notch when redirecting CAPI (:touch :rotate) into horizontal scroll on Win32.")
+
+(defun om-shift-wheel-hscroll-handler (pane x y angle)
   (declare (ignore x y))
   (when (typep pane 'om-scroller)
+    #+win32
+    (let* ((step  (or *om-shift-wheel-hscroll-step* 50))
+           (pos   (om-scroll-position pane))
+           (hpos  (om-point-h pos))
+           (vpos  (om-point-v pos))
+           (delta (if (plusp angle) step (- step)))
+           (new-x (max 0 (+ hpos delta))))
+      (om-move-scroll-position pane (om-make-point new-x vpos))
+      (om-set-h-scroll-position pane new-x)
+      (om-invalidate-view pane t))
+    #-win32
     (cond ((plusp  angle) (om-zoom-scroll-pane pane :om-key-right))
           ((minusp angle) (om-zoom-scroll-pane pane :om-key-left)))))
 
@@ -905,7 +936,7 @@ Returns the clamped factor, or NIL when no change."
 ;;; --- exports ---
 
 (export '(+om-zoom-min+ +om-zoom-max+
-          *om-zoom-default* *om-zoom-gesture-sensitivity*
+          *om-zoom-default* *om-zoom-gesture-sensitivity* #+win32 *om-shift-wheel-hscroll-step*
           *om-zoom-in-progress-p* *om-zoom-unscale-mouse-pos-p*
           *om-zoom-diag-events-p* *om-zoom-diag-apply-p*
           *om-zoom-mini-helper-scale*
@@ -927,13 +958,14 @@ Returns the clamped factor, or NIL when no change."
           om-current-ombox-font
           om-current-icon-size-factor om-current-miniview-font-size
           om-zoom-update om-set-zoom om-reset-zoom om-get-zoom
-          om-zoom-touch-handler om-zoom-shift-wheel-handler
+          om-zoom-touch-handler om-shift-wheel-hscroll-handler
           om-zoom-touch-swipe-handler om-zoom-ctrl-arrow-handler
           om-zoom-scroll-pane
           #+win32 om-zoom-touch-pan-handler
           om-zoom-touch-anchor
           tracked-scroll-x tracked-scroll-y
-          om-move-scroll-position)
+          om-move-scroll-position
+          om-zoom-resolve-touch-target)
         :om-api)
 
 ;;; ===== End zoom support =====

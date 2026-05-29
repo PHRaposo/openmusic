@@ -265,6 +265,20 @@
 (defmethod dieditorframe-p ((self t)) nil)
 (defmethod dieditorframe-p ((self DIEditorframe)) self)
 
+(defmethod om-zoom-resolve-touch-target ((pane DIEditorframe) x y)
+  "CAPI delivers (:touch :zoom) to this nested pinboard-layout; redirect the
+   zoom to the parent patch panel with the anchor in the scroller's frame.
+   Win32 anchor expects viewport coord; Mac/Linux expects pinboard."
+  (let ((scroller (panel pane)))
+    (when (typep scroller 'oa::om-scroller)
+      (let* ((px (+ (oa::vx pane) x))
+             (py (+ (oa::vy pane) y)))
+        (values scroller
+                #+win32 (- px (oa::tracked-scroll-x scroller))
+                #-win32 px
+                #+win32 (- py (oa::tracked-scroll-y scroller))
+                #-win32 py)))))
+
 (defmethod om-show-tooltip ((self input-funboxframe) &optional (remove nil) (short nil))
   "prevenrting tooltips for interface boxes"
   (unless (dieditorframe-p (om-view-container self))

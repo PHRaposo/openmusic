@@ -152,7 +152,7 @@
 
                   ;; ZOOM-INPUT: touch gesture bindings (Cocoa/Win32 only).
                   ((:touch :zoom)   om-zoom-touch-handler)
-                  #+win32 ((:touch :rotate) om-zoom-shift-wheel-handler)
+                  #+win32 ((:touch :rotate) om-shift-wheel-hscroll-handler)
                   ((:touch :swipe)  om-zoom-touch-swipe-handler)
                   #+win32 ((:touch :pan) om-zoom-touch-pan-handler)
 		  )
