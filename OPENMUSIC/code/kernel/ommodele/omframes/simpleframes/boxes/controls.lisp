@@ -247,7 +247,24 @@
     ))
 
 
-(defclass change-text-enter-view (edit-text-enter-view) ())
+(defun cancel-ttybox-edit (self)
+  "ESC handler for ttybox text-input: discard the in-flight box and abort."
+  (when (and self (om-view-container self))
+    (let* ((box-frame (om-view-container (object self)))
+           (scroller (and box-frame (om-view-container box-frame)))
+           (theeditor (and box-frame (editor box-frame))))
+      (when (and scroller box-frame)
+        (omG-remove-element scroller box-frame))
+      (when theeditor
+        (setf (text-view theeditor) nil)
+        (om-remove-subviews (panel theeditor) self)
+        (om-invalidate-view (panel theeditor)))))
+  (om-abort))
+
+(defclass change-text-enter-view (edit-text-enter-view) ()
+  (:default-initargs
+   :gesture-callbacks '((#\Escape . cancel-ttybox-edit)
+                        (#\Tab    . capi:text-input-pane-complete-text))))
 
 
 (defmethod om-dialog-item-action ((self change-text-enter-view))
@@ -314,6 +331,7 @@
                (logical-pos (if (= zoom 1.0) pos (om-zoom-unscale-point pos zoom))))
           (unwind-protect
               (add-box-in-patch-panel newtext scroller logical-pos)
+            (real-make-delete-before scroller (list box-frame))
             (omG-remove-element scroller box-frame)
             (setf (text-view theeditor) nil)
             (om-remove-subviews (panel theeditor) self)
@@ -466,7 +484,10 @@
 
 ;-----------EDITION
 
-(defclass new-fun-enter-view (edit-text-enter-view) ())   
+(defclass new-fun-enter-view (edit-text-enter-view) ()
+  (:default-initargs
+   :gesture-callbacks '((#\Escape . cancel-ttybox-edit)
+                        (#\Tab    . capi:text-input-pane-complete-text))))
 
 (defmethod open-ttybox-class ((self undef-ttybox)) 'new-fun-enter-view)
 (defmethod initial-text-ttybox ((self undef-ttybox)) "??")

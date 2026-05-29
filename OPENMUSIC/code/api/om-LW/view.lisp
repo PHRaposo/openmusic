@@ -242,8 +242,14 @@
   (when (eq operation :move)
     (cond
      ((and (consp pos-list) (numberp (first pos-list)) (numberp (second pos-list)))
-      (setf (tracked-scroll-x self) (first pos-list)
-            (tracked-scroll-y self) (second pos-list)))
+      ;; Cocoa fires a reentrant scroll-update during om-zoom-update with
+      ;; pos-list adjusted post-relayout (observed delta-Y: -16, -29, -36, -38, -32 px
+      ;; in successive pinch-out events). Skip the tracked-scroll write so
+      ;; om-zoom-update's authoritative new-sx/sy stays intact across the gesture;
+      ;; om-view-scrolled and invalidate-rectangle below still run.
+      (unless *om-zoom-in-progress-p*
+        (setf (tracked-scroll-x self) (first pos-list)
+              (tracked-scroll-y self) (second pos-list))))
      ((and (eq dimension :horizontal) (numberp pos-list))
       (setf (tracked-scroll-x self) pos-list))
      ((and (eq dimension :vertical) (numberp pos-list))
@@ -816,13 +822,22 @@ Returns the clamped factor, or NIL when no change."
                                 (bottom (+ (om-point-v p) (om-point-v s))))
                             (when (> right  content-h) (setf content-h right))
                             (when (> bottom content-v) (setf content-v bottom))))))
-                    (let ((target-h (max (or vw 0) content-h (+ new-sx (or vw 0))))
-                          (target-v (max (or vh 0) content-v (+ new-sy (or vh 0)))))
+                    (let* ((target-h (max (or vw 0) content-h (+ new-sx (or vw 0))))
+                           (target-v (max (or vh 0) content-v (+ new-sy (or vh 0))))
+                           ;; ZOOM-COORD: clamp slug to valid scroll range
+                           ;; max-slug = max 0 (- target vw/vh).
+                           ;; Example zoom-out: vh=374, target-v=1021 -> max-slug-y=647;
+                           ;; new-sy=367 stays 367. When new-sy would exceed 647,
+                           ;; clamping here prevents Cocoa auto-clamp + reentrant callback.
+                           (new-sx-valid (max 0 (min new-sx (max 0 (- target-h (or vw 0))))))
+                           (new-sy-valid (max 0 (min new-sy (max 0 (- target-v (or vh 0)))))))
                       (capi::set-horizontal-scroll-parameters pane :min-range 0 :max-range target-h)
-                      (capi::set-vertical-scroll-parameters   pane :min-range 0 :max-range target-v))))
-                (om-set-h-scroll-position pane new-sx)
-                (om-set-v-scroll-position pane new-sy)
-                (capi::scroll pane :pan :move (list new-sx new-sy)))
+                      (capi::set-vertical-scroll-parameters   pane :min-range 0 :max-range target-v)
+                      (setf (tracked-scroll-x pane) new-sx-valid)
+                      (setf (tracked-scroll-y pane) new-sy-valid)
+                      (om-set-h-scroll-position pane new-sx-valid)
+                      (om-set-v-scroll-position pane new-sy-valid)
+                      (capi::scroll pane :pan :move (list new-sx-valid new-sy-valid))))))
             (om-invalidate-view pane t)))
         clamped))))
 
