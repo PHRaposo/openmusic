@@ -67,13 +67,12 @@
                     "tooltips"
                     "print"
                     "libraries"                 
-                    "om-special"  
-                    
+                    "om-special"
+                    "zoom"
+
                     ))
 
 (mapc #'(lambda (filename) (compile&load (make-pathname :directory *api-directory* :name filename))) *api-files*)
-
-
 
 (pushnew :om-api *features*)
 

@@ -204,7 +204,7 @@
            (xpos (om-point-x pos)))
       (om-set-view-size self (om-make-point big big))
       (om-set-view-position self (om-make-point (- xpos off) ypos)))
-    #+win32(capi:redraw-pinboard-object self)))
+    #+win32(om-redraw-pinboard-object self)))
 
 (defmethod om-view-mouse-leave-handler ((self outfleche))
   (when *mag-in-out*
@@ -218,7 +218,7 @@
       (om-set-view-size self (om-make-point small small))
       (om-set-view-position self (om-make-point (+ (om-point-x (om-view-position self)) off2)
                                                 (- psizey off9))))
-    #+win32(capi:redraw-pinboard-object self)))
+    #+win32(om-redraw-pinboard-object self)))
 
 
 ;--------------CONNECTION

@@ -56,9 +56,9 @@
          ;; ZOOM-PERSIST: restore w-zoom inherited via OMPatchAbs slot.
          (let ((z (w-zoom self)))
            (when (and panel z (typep panel 'om-scroller) (not (= z 1.0)))
-             (setf (capi:capi-object-property panel :om-zoom-restoring-p) t)
+             (setf (om-pane-property panel :om-zoom-restoring-p) t)
              (om-zoom-update panel z)
-             (setf (capi:capi-object-property panel :om-zoom-restoring-p) nil)))
+             (setf (om-pane-property panel :om-zoom-restoring-p) nil)))
          panel)))
 
 (defmethod omng-remove-element ((self patchForLoop) (box OMIn))
@@ -489,7 +489,7 @@
   "Add the loop toolbar (iterators + accumulators) into the editor's zoom bar."
   (call-next-method)
   (let* ((editor      (editor self))
-         (bar         (and editor (capi:capi-object-property editor :om-zoom-editor-bar)))
+         (bar         (and editor (om-pane-property editor :om-zoom-editor-bar)))
          (iterators   '((om-icon-button "loop-for"    "For i from A to B"   forloop    "for")
                         (om-icon-button "loop-while"  "While A"             whileloop  "while")
                         (om-icon-button "loop-list"   "For element in list" listloop   "inlist")

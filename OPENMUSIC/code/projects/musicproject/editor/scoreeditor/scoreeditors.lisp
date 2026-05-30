@@ -2322,7 +2322,7 @@
       (om-redraw-view self))
     (when (or (score-page-mode self) (in-patch-mode? self))
       (update-panel self )
-      #+macosx(update-slot-edit self); maybe also others, linux, etc.?
+      #+(or macosx darwin darwin-target)(update-slot-edit self); maybe also others, linux, etc.?
       )
     (let ((nb (find-score-zoom-numbox self)))
       (when (and nb (not (= (value nb) newzoom)))
@@ -2651,7 +2651,7 @@
                                :di-action #'(lambda (w new-size)
                                               (declare (ignore w))
                                               (change-editor-size panel new-size)
-                                              (capi:redisplay-element panel)))))
+                                              (om-redisplay-element panel)))))
     (setf (font-zoom-widget control-view) widget)
     widget))
 

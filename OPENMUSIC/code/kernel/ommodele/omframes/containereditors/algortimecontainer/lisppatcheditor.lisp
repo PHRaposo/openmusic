@@ -168,7 +168,7 @@ Lambda expression are of the form (lambda <param-list> <body>)"))
     (let ((ep (om-lisp::ep editor))
           (ratio (w-zoom patch)))
       (when (and ep
-                 (capi:capi-object-property ep :om-zoom-default-font)
+                 (om-pane-property ep :om-zoom-default-font)
                  (not (= ratio 1.0)))
         (oa::set-pane-zoom-ratio ep ratio)))))
 

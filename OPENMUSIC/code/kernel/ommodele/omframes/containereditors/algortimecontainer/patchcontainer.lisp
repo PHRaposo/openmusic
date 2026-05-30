@@ -893,7 +893,7 @@ The order of listed boxes is spatial, ie. from left to right."
         (sx   (om-h-scroll-position pane))
         (sy   (om-v-scroll-position pane)))
     (let ((k (if (= zoom 0) 1.0 (/ 1.0 zoom))))
-      (multiple-value-bind (vw vh) (capi:simple-pane-visible-size pane)
+      (multiple-value-bind (vw vh) (om-pane-visible-size pane)
         (values (round (* sx k))
                 (round (* sy k))
                 (max 1 (round (* (or vw (vw pane)) k)))
@@ -1586,7 +1586,7 @@ Elements of the list are list as (source-position source-output target-position 
 
 ;; :om-zoom-numbox holds the om-zoom-pop-up widget (named for legacy callers).
 (defun om-zoom-sync-numbox (pane new-zoom)
-  (let ((widget (capi:capi-object-property pane :om-zoom-numbox)))
+  (let ((widget (om-pane-property pane :om-zoom-numbox)))
     (when widget
       (om-set-zoom-pop-up-value widget (round (* new-zoom 100))))))
 
@@ -1625,7 +1625,7 @@ Elements of the list are list as (source-position source-output target-position 
 (defun om-zoom-step-anchored (pane new-zoom)
   "Anchor at the center of the current selection bbox if any,
    otherwise at the center of all content. Empty panel falls back to viewport center."
-  (multiple-value-bind (vw vh) (capi:simple-pane-visible-size pane)
+  (multiple-value-bind (vw vh) (om-pane-visible-size pane)
     (let* ((vw (or vw 0))
            (vh (or vh 0))
            (sx (oa::tracked-scroll-x pane))
@@ -1647,7 +1647,7 @@ Elements of the list are list as (source-position source-output target-position 
 (defun om-zoom-reset-and-recenter (pane)
   "Reset zoom to 1.0 and scroll so the content bbox center lands at the viewport center
    (clamped to non-negative scroll)."
-  (multiple-value-bind (vw vh) (capi:simple-pane-visible-size pane)
+  (multiple-value-bind (vw vh) (om-pane-visible-size pane)
     (let* ((vw (or vw 0))
            (vh (or vh 0))
            (current-zoom (om-zoom-of pane))
@@ -1752,8 +1752,8 @@ Elements of the list are list as (source-position source-output target-position 
     (om-add-subviews bar out-btn in-btn zoom-bg zoom-label numbox)
     (om-add-subviews editor bar)
     (when panel
-      (setf (capi:capi-object-property panel :om-zoom-numbox) numbox))
-    (setf (capi:capi-object-property editor :om-zoom-editor-bar) bar)
+      (setf (om-pane-property panel :om-zoom-numbox) numbox))
+    (setf (om-pane-property editor :om-zoom-editor-bar) bar)
     bar))
 
 (defmethod initialize-instance ((self patchEditor) &rest initargs)
@@ -1764,7 +1764,7 @@ Elements of the list are list as (source-position source-output target-position 
 (defmethod update-subviews ((self patchEditor))
   (call-next-method)
   (when (om-zoom-editor-applies-p self)
-    (let ((bar (capi:capi-object-property self :om-zoom-editor-bar)))
+    (let ((bar (om-pane-property self :om-zoom-editor-bar)))
       (when bar
         (om-set-view-size bar (om-make-point (w self) +om-zoom-bar-h+))))))
 
@@ -1773,7 +1773,7 @@ Elements of the list are list as (source-position source-output target-position 
   (let* ((editor (om-view-container pane))
          (patch  (and editor (object editor))))
     (when (and patch (typep patch 'OMPersistantObject)
-               (not (capi:capi-object-property pane :om-zoom-restoring-p)))
+               (not (om-pane-property pane :om-zoom-restoring-p)))
       (set-win-zoom patch factor))))
 ;;; ===== End zoom support =====
 

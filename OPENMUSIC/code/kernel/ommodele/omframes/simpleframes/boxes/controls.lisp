@@ -263,8 +263,8 @@
 
 (defclass change-text-enter-view (edit-text-enter-view) ()
   (:default-initargs
-   :gesture-callbacks '((#\Escape . cancel-ttybox-edit)
-                        (#\Tab    . capi:text-input-pane-complete-text))))
+   :gesture-callbacks `((#\Escape . cancel-ttybox-edit)
+                        (#\Tab    . ,om-text-input-tab-complete))))
 
 
 (defmethod om-dialog-item-action ((self change-text-enter-view))
@@ -486,8 +486,8 @@
 
 (defclass new-fun-enter-view (edit-text-enter-view) ()
   (:default-initargs
-   :gesture-callbacks '((#\Escape . cancel-ttybox-edit)
-                        (#\Tab    . capi:text-input-pane-complete-text))))
+   :gesture-callbacks `((#\Escape . cancel-ttybox-edit)
+                        (#\Tab    . ,om-text-input-tab-complete))))
 
 (defmethod open-ttybox-class ((self undef-ttybox)) 'new-fun-enter-view)
 (defmethod initial-text-ttybox ((self undef-ttybox)) "??")

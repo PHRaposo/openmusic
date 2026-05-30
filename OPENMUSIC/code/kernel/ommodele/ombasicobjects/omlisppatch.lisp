@@ -170,7 +170,7 @@
         (cls (find-class 'patch-lambda-exp-window nil)))
     (when (and editor cls (typep editor cls))
       (let ((ep (om-lisp::ep editor)))
-        (when (and ep (capi:capi-object-property ep :om-zoom-default-font))
+        (when (and ep (om-pane-property ep :om-zoom-default-font))
           (setf (w-zoom patch) (oa::pane-current-zoom-ratio ep)))))))
 ;;; ===== End zoom support =====
 

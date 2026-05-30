@@ -201,7 +201,7 @@
              (xpos (om-point-x pos)))
         (om-set-view-size self (om-make-point big big))
         (om-set-view-position self (om-make-point (- xpos off2) (- ypos off5)))))
-    #+win32(capi:redraw-pinboard-object self)))
+    #+win32(om-redraw-pinboard-object self)))
 
 #|
 ;;;new : text-view is on the panel
@@ -243,7 +243,7 @@
                 (om-remove-subviews p (text-view container))
                 (setf (text-view container) nil))
             (when p (setf (oa::locked p) prev-lock)))))))
-  #+win32(capi:redraw-pinboard-object self))
+  #+win32(om-redraw-pinboard-object self))
 
 
 (defclass input-text-enter-view (edit-text-enter-view) ())
@@ -290,7 +290,7 @@
         (omG-add-element target new-frame)
         (connect-box (car (outframes new-frame)) self)
         (open-ttybox (iconview new-frame))
-        #+linux(capi:redisplay-element target)))
+        #+linux(om-redisplay-element target)))
 
      ((menu-input-p (object self))
       (popup-input-menu (object self) panel))

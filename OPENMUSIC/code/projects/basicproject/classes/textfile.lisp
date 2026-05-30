@@ -451,7 +451,7 @@ As output it returns the contents of the text buffer as a list formatted accordi
   (let ((win (or editor (find-textfile-editor textfile))))
     (when win
       (let ((ep (om-lisp::ep win)))
-        (when (and ep (capi:capi-object-property ep :om-zoom-default-font))
+        (when (and ep (om-pane-property ep :om-zoom-default-font))
           (setf (w-zoom textfile) (oa::pane-current-zoom-ratio ep)))))))
 
 (defun apply-saved-textfile-zoom (editor textfile)
@@ -460,7 +460,7 @@ As output it returns the contents of the text buffer as a list formatted accordi
     (let ((ep (om-lisp::ep editor))
           (ratio (w-zoom textfile)))
       (when (and ep
-                 (capi:capi-object-property ep :om-zoom-default-font)
+                 (om-pane-property ep :om-zoom-default-font)
                  (not (= ratio 1.0)))
         (oa::set-pane-zoom-ratio ep ratio)))))
 

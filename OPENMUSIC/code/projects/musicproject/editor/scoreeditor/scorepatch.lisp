@@ -60,8 +60,8 @@
                                    :position
                                    #+(or linux win32)(om-make-point (- (round (om-point-h (frame-size self)) 2) 4)
                                                                     (+ (h module) 10))
-                                   #+macosx(om-make-point (- (round (om-point-h (frame-size self)) 2) 4)
-                                                          (+ (h module) 2))
+                                   #+(or macosx darwin darwin-target)(om-make-point (- (round (om-point-h (frame-size self)) 2) 4)
+                                                                                    (+ (h module) 2))
                                    :size (om-make-point 8 8)
                                    :help-spec "option-click to evalue or drag for connections"
                                    :index 0))
@@ -100,8 +100,8 @@
                                    :position
                                    #+(or linux win32)(om-make-point (- (round (om-point-h module-vsize) 2) off-x)
                                                                     (+ (h module) off-y10))
-                                   #+macosx(om-make-point (- (round (om-point-h module-vsize) 2) off-x)
-                                                          (+ (h module) off-y2))
+                                   #+(or macosx darwin darwin-target)(om-make-point (- (round (om-point-h module-vsize) 2) off-x)
+                                                                                    (+ (h module) off-y2))
                                    :size (om-make-point io-size io-size)
                                    :help-spec "option-click to evalue or drag for connections"
                                    :index 0))

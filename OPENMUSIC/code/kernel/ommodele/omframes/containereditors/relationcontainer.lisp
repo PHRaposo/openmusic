@@ -95,12 +95,12 @@ maquettes and hierarchical class editors.#enddoc#
                              (let ((z (get-win-zoom object)))
                                (and (numberp z) (/= z 1.0) z)))))
        (when saved-zoom
-         (setf (capi:capi-object-property panel :om-zoom-restoring-p) t)
+         (setf (om-pane-property panel :om-zoom-restoring-p) t)
          (unwind-protect
              (progn
                (setf (om-zoom-of panel) saved-zoom)
                (om-zoom-sync-display panel saved-zoom))
-           (setf (capi:capi-object-property panel :om-zoom-restoring-p) nil)))
+           (setf (om-pane-property panel :om-zoom-restoring-p) nil)))
        (om-with-delayed-redraw panel
          (om-with-delayed-update panel
            (mapc #'(lambda (elem)
@@ -120,7 +120,7 @@ maquettes and hierarchical class editors.#enddoc#
      ;(om-window-resized newwindow (om-view-size newwindow))
      ;(om-invalidate-view (panel newwindow))
      ;(om-select-window newwindow)
-     #+linux(capi:redisplay-element (panel newwindow))
+     #+linux(om-redisplay-element (panel newwindow))
      newwindow))
 
 ;----------------------------------------------------

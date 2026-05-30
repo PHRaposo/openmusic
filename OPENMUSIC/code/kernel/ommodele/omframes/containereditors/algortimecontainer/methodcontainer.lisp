@@ -495,8 +495,8 @@ Elements of methodPanels are instaces of the boxframe class.#enddoc#
     (om-add-subviews bar out-btn in-btn zoom-bg zoom-label numbox)
     (om-add-subviews editor bar)
     (when panel
-      (setf (capi:capi-object-property panel :om-zoom-numbox) numbox))
-    (setf (capi:capi-object-property editor :om-zoom-editor-bar) bar)
+      (setf (om-pane-property panel :om-zoom-numbox) numbox))
+    (setf (om-pane-property editor :om-zoom-editor-bar) bar)
     bar))
 ;;; ===== End zoom support =====
 

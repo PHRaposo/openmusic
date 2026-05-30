@@ -298,7 +298,7 @@
           (om-set-view-position self
                                 (om-make-point (om-point-x cur-pos)
                                                (- parent-h own-h)))
-          #+win32(capi:redraw-pinboard-object self))))))
+          #+win32(om-redraw-pinboard-object self))))))
 
 
 (defmethod show-fun-code ((self DIEditorframe))
@@ -550,11 +550,11 @@ Evaluate or connect the output to get the current contents of the box.
   (let* ((zoom (om-zoom-effective container))
          (mx   (round (* 12 zoom)))
          (my   #+win32  (round (* 12 zoom))
-               #+macosx (round (* 10 zoom))
+               #+(or macosx darwin darwin-target) (round (* 10 zoom))
                #+linux  (round (* 20 zoom)))
          (dx   (round (* 28 zoom)))
          (dy   #+win32  (round (* 24 zoom))
-               #+macosx (round (* 20 zoom))
+               #+(or macosx darwin darwin-target) (round (* 20 zoom))
                #+linux  (round (* 40 zoom))))
     (om-set-view-position self (om-make-point mx my))
     (om-set-view-size self (om-subtract-points (om-view-size container)
@@ -725,8 +725,8 @@ Pushing the button will automatically evaluate anything connected to the second 
 (defmethod update-di-size ((self button) container)
   (let* ((zoom (om-zoom-effective container))
          (mx   (round (* 10 zoom)))
-         (yoff #+mswindows (round (* 12 zoom))
-               #-mswindows (round (* 11 zoom)))
+         (yoff #+(or mswindows win32) (round (* 12 zoom))
+               #-(or mswindows win32) (round (* 11 zoom)))
          (dx   (round (* 20 zoom)))
          (bh   (round (* 24 zoom))))
     (om-set-view-position self (om-make-point mx (- (round (h container) 2) yoff)))

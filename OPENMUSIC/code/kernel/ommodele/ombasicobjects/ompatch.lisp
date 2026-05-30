@@ -236,10 +236,10 @@ put this code in this method."
           (let ((z (get-win-zoom self)))
             (when (and panel z (typep panel 'om-scroller) (not (= z 1.0)))
               (let ((was-changed (changed-wsparams? self)))
-                (setf (capi:capi-object-property panel :om-zoom-restoring-p) t)
+                (setf (om-pane-property panel :om-zoom-restoring-p) t)
                 (unwind-protect
                     (om-zoom-update panel z)
-                  (setf (capi:capi-object-property panel :om-zoom-restoring-p) nil)
+                  (setf (om-pane-property panel :om-zoom-restoring-p) nil)
                   (setf (changed-wsparams? self) was-changed)))))
           panel))))
 
@@ -564,10 +564,10 @@ So abstractions or red patches can not be sharing.#enddoc#
            ;; ZOOM-PERSIST: restore saved zoom on editor open.
            (let ((z (w-zoom self)))
              (when (and panel z (typep panel 'om-scroller) (not (= z 1.0)))
-               (setf (capi:capi-object-property panel :om-zoom-restoring-p) t)
+               (setf (om-pane-property panel :om-zoom-restoring-p) t)
                (unwind-protect
                    (om-zoom-update panel z)
-                 (setf (capi:capi-object-property panel :om-zoom-restoring-p) nil))))
+                 (setf (om-pane-property panel :om-zoom-restoring-p) nil))))
            panel))))
 
 (defmethod OpenSrEditorframe ((self OMPatchAbs))
