@@ -255,31 +255,14 @@ Ex. (repeat-n (+ 1 1) 4) ==> (2 2 2 2)"
 
 (defmethod add-select-enabled ((self patchpanel) type) t)
 
-#|
 (defmethod add-select ((self patchpanel) position)
    (when (add-select-enabled self 'om-select)
-     (let* ((boxes (get-subframes self))
+     (let* ((boxes (get-subframes self)) 
             (i (length (list+ (find-class-boxes boxes 'tempOutFrame) (find-class-boxes boxes 'selectframe))))
             (pos (or position (om-make-point (+ 5 (* i 50)) 240)))
             (newsend (make-new-select (mk-unique-name self "om-select") i pos t))
             )
        (omG-add-element self (make-frame-from-callobj newselect))
-       (set-field-size self)
-       )))
-|#
-
-(defmethod add-select ((self patchpanel) position)
-   (when (add-select-enabled self 'om-select)
-     (let* ((boxes (get-subframes self))
-            (i (length (list+ (find-class-boxes boxes 'tempOutFrame) (find-class-boxes boxes 'selectframe))))
-            (pos (or position (om-make-point (+ 5 (* i 50)) 240)))
-            (newsend (make-new-select (mk-unique-name self "om-select") i pos t))
-            )
-       (omG-add-element self
-                        ;; ZOOM-CTX: propagate panel zoom to new select-box frame.
-                        (let ((*make-frame-zoom-context*
-                               (and (typep self 'om-scroller) (om-zoom-of self))))
-                          (make-frame-from-callobj newselect)))
        (set-field-size self)
        )))
 
