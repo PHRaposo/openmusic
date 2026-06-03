@@ -897,31 +897,7 @@ Returns the clamped factor, or NIL when no change."
 (defvar *om-shift-wheel-hscroll-step* 50
   "Pixels per Shift+MouseWheel notch when redirecting CAPI (:touch :rotate) into horizontal scroll on Win32.")
 
-#|
 (defun om-shift-wheel-hscroll-handler (pane x y angle)
-  (declare (ignore x y))
-  (when (typep pane 'om-scroller)
-    #+win32
-    (let* ((step  (or *om-shift-wheel-hscroll-step* 50))
-           (pos   (om-scroll-position pane))
-           (hpos  (om-point-h pos))
-           (vpos  (om-point-v pos))
-           (delta (if (plusp angle) step (- step)))
-           (new-x (max 0 (+ hpos delta))))
-      (om-move-scroll-position pane (om-make-point new-x vpos))
-      (om-set-h-scroll-position pane new-x)
-      (om-invalidate-view pane t))
-    #-win32
-    (cond ((plusp  angle) (om-zoom-scroll-pane pane :om-key-right))
-          ((minusp angle) (om-zoom-scroll-pane pane :om-key-left)))))
-|#
-
-(defgeneric om-shift-wheel-hscroll-handler (pane x y angle)
-  (:documentation
-   "CAPI input-model handler for Win32 Shift+MouseWheel ((:touch :rotate)).
-Specialize on PANE class to override the gesture per widget."))
-
-(defmethod om-shift-wheel-hscroll-handler ((pane t) x y angle)
   (declare (ignore x y))
   (when (typep pane 'om-scroller)
     #+win32
