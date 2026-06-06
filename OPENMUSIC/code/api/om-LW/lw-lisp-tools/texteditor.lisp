@@ -44,6 +44,7 @@
           om-set-bg-color
           om-get-editor-panel
           om-destroy-callback
+          customize-text-editor-pane
           *line-numbers*
           *line-color-numbers*
          ) :om-lisp)
@@ -493,8 +494,16 @@
 (defparameter *line-numbers* t)
 (defparameter *line-color-numbers* t)
 
+;; ZOOM-INPUT: hook for specializations to install zoom input entries.
+
+(defgeneric customize-text-editor-pane (win)
+  (:documentation "Hook called after the editor-pane is built but before the window is displayed."))
+
+(defmethod customize-text-editor-pane ((win t)) nil)
+
 ;;; NEW EDITOR
 ;;; (called from menu "New")
+#|
 (defun open-new-text-editor (&optional path)
   (let ((win (when path (find-open-file path *editor-files-open*))))
     (if win (capi::find-interface (type-of win) :name (capi::capi-object-name win))
@@ -508,18 +517,18 @@
                                  :display-state :normal
                                  :internal-min-height 200 :internal-min-width 300
                                   ;:font (om-make-font "courier" 20)
-                                 :title (if path (namestring path) "New Buffer") 
+                                 :title (if path (namestring path) "New Buffer")
                                  :editor-buffer (make-instance 'ombuffer :buffer buffer)
                                  :editor-file path
-                                 :activate-callback #'(lambda (win activate-p) 
+                                 :activate-callback #'(lambda (win activate-p)
                                                         (when activate-p
-                                                          (setf (capi::interface-menu-bar-items win) 
+                                                          (setf (capi::interface-menu-bar-items win)
                                                                 (append (internal-window-class-menubar win)
                                                                         (om-window-class-menubar win)))))
                                  :lisp-editor? t
                                  ))
-        (setf (capi::layout-description (capi::pane-layout win)) 
-              (list (setf (ep win) (make-instance 'capi::editor-pane :echo-area t 
+        (setf (capi::layout-description (capi::pane-layout win))
+              (list (setf (ep win) (make-instance 'capi::editor-pane :echo-area t
                                                   :font *def-text-edit-font*
                                                   :line-numbers-p *line-numbers*
                                                   ;:line-numbers-background (om::om-color-to-capi *line-color-numbers*)
@@ -529,12 +538,44 @@
         (capi::display win)
         ;(capi::execute-with-interface win
         ;                              #'(lambda ()
-        ;                                  (when (lisp-editor? win) 
-        ;                                      (call-editor (ep win) 
+        ;                                  (when (lisp-editor? win)
+        ;                                      (call-editor (ep win)
         ;                                                   (list 'editor:lisp-mode-command (editor-pane-buffer (ep win))))
         ;                                      (echo-string win ""))))
         win
         ))))
+|#
+(defun open-new-text-editor (&optional path)
+  (let ((win (when path (find-open-file path *editor-files-open*))))
+    (if win (capi::find-interface (type-of win) :name (capi::capi-object-name win))
+      (let* ((buffer (if path (editor:find-file-buffer path)
+                       (editor::make-buffer (string (gensym))))))
+        (setf win (make-instance *editor-class*
+                                 :name (string (gensym))
+                                 :x 200 :y 200 :width 800 :height 800
+                                 :parent (capi:convert-to-screen)
+                                 :internal-border 5 :external-border 0
+                                 :display-state :normal
+                                 :internal-min-height 200 :internal-min-width 300
+                                 :title (if path (namestring path) "New Buffer")
+                                 :editor-buffer (make-instance 'ombuffer :buffer buffer)
+                                 :editor-file path
+                                 :activate-callback #'(lambda (win activate-p)
+                                                        (when activate-p
+                                                          (setf (capi::interface-menu-bar-items win)
+                                                                (append (internal-window-class-menubar win)
+                                                                        (om-window-class-menubar win)))))
+                                 :lisp-editor? t))
+        (setf (capi::layout-description (capi::pane-layout win))
+              (list (setf (ep win) (make-instance 'capi::editor-pane
+                                                  :echo-area t
+                                                  :font *def-text-edit-font*
+                                                  :line-numbers-p *line-numbers*))))
+        (customize-text-editor-pane win)
+        (push win *editor-files-open*)
+        (setf (capi::simple-pane-background (ep win)) *text-bg-color*)
+        (capi::display win)
+        win))))
 
 (defmethod capi:interface-display :after ((win om-text-editor))
   (capi::execute-with-interface win
@@ -846,9 +887,17 @@
       (call-editor ep (list 'editor::undo-command buffer)))))
 
 
-(defvar *def-text-edit-font* 
+(defvar *def-text-edit-font*
   #+linux(gp::make-font-description :family "Liberation Mono" :size 11)
   #-linux(gp::make-font-description :family "Consolas" :size 11))
+
+(defvar *om-lisp-patch-font*
+  #+linux (gp::make-font-description :family "Liberation Mono" :size 11)
+  #-linux (gp::make-font-description :family "Consolas" :size 11))
+
+(defvar *om-lisp-edit-font*
+  #+linux (gp::make-font-description :family "Liberation Mono" :size 11)
+  #-linux (gp::make-font-description :family "Consolas" :size 11))
 
 (defmethod change-text-edit-font ((self om-text-editor))
   (with-slots (ep) self
