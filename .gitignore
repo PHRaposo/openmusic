@@ -14,6 +14,7 @@
 *.app/
 /OM 6.*/**/*
 /OM 7.*/**/*
+/OM 8.*/**/*
 /OPENMUSIC/OM_6.*
 /OPENMUSIC/OM_7.*
 /distrib/
